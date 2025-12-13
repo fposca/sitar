@@ -57,9 +57,12 @@ type AudioEngineContextValue = {
   // Reverb
   reverbAmount: number; // 0..1
   setReverbAmount: (value: number) => void;
+
+  // Monitor
   monitorEnabled: boolean;
   setMonitorEnabled: (v: boolean) => void;
 
+  // Acciones
   setupGuitarInput: () => Promise<void>;
   loadBackingFile: (file: File) => Promise<void>;
   startPlaybackAndRecording: () => Promise<void>;
@@ -144,15 +147,14 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [backingBuffer, setBackingBuffer] = useState<AudioBuffer | null>(null);
   const [backingName, setBackingName] = useState<string | null>(null);
-  const [monitorEnabled, setMonitorEnabled] = useState<boolean>(false);
-  const monitorNodeRef = useRef<GainNode | null>(null);
-  const monitorOutputRef = useRef<GainNode | null>(null);
   const [backingWaveform, setBackingWaveform] = useState<number[] | null>(null);
 
   const [isInputReady, setIsInputReady] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [status, setStatus] = useState<string>('Esperando...');
   const [playbackProgress, setPlaybackProgress] = useState(0);
+
+  const [monitorEnabled, setMonitorEnabled] = useState<boolean>(false);
 
   // Parámetros del delay
   const [delayTimeMs, setDelayTimeMs] = useState(350);
@@ -190,17 +192,30 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const progressAnimationRef = useRef<number | null>(null);
   const isPlayingBackingRef = useRef<boolean>(false);
 
-  // refs para controlar efectos en tiempo real
+  // Effect graph nodes (compartidos entre monitor + recording)
+  const ampGainNodeRef = useRef<GainNode | null>(null);
+  const toneFilterRef = useRef<BiquadFilterNode | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
+
   const wetGainRef = useRef<GainNode | null>(null);
+  const delayNodeRef = useRef<DelayNode | null>(null);
+  const feedbackGainRef = useRef<GainNode | null>(null);
+
   const sitarDryRef = useRef<GainNode | null>(null);
   const sitarWetRef = useRef<GainNode | null>(null);
   const driveNodeRef = useRef<WaveShaperNode | null>(null);
   const sitarBandpassRef = useRef<BiquadFilterNode | null>(null);
   const sitarSympatheticRef = useRef<BiquadFilterNode | null>(null);
+
   const reverbWetRef = useRef<GainNode | null>(null);
   const reverbDryRef = useRef<GainNode | null>(null);
   const reverbImpulseRef = useRef<AudioBuffer | null>(null);
-  const postFxGainRef = useRef<GainNode | null>(null); // 👈 NUEVO
+
+  const postFxGainRef = useRef<GainNode | null>(null);
+
+  // Monitor + bus de grabación
+  const monitorNodeRef = useRef<GainNode | null>(null);
+  const recordGainRef = useRef<GainNode | null>(null);
 
   const getOrCreateAudioContext = useCallback(() => {
     if (audioContext) return audioContext;
@@ -234,6 +249,185 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     [],
   );
 
+  // Construye (una sola vez) el grafo de efectos de la guitarra.
+  // Este mismo grafo se usa tanto para el monitor como para la grabación.
+  const ensureGuitarGraph = useCallback(() => {
+    if (!audioContext) return;
+    if (!guitarSourceRef.current) return;
+
+    // Si ya lo armamos, no volvemos a conectar nada
+    if (postFxGainRef.current) return;
+
+    const ctx = audioContext;
+    const guitarSource = guitarSourceRef.current;
+
+    // === AMP INPUT & DRIVE ===
+    const ampGainNode = ctx.createGain();
+    ampGainNode.gain.value = ampGain;
+    ampGainNodeRef.current = ampGainNode;
+
+    const driveNode = ctx.createWaveShaper();
+    driveNode.curve = makeDriveCurve(driveEnabled ? driveAmount * 6 : 0);
+    driveNode.oversample = '4x';
+    driveNodeRef.current = driveNode;
+
+    const toneFilter = ctx.createBiquadFilter();
+    toneFilter.type = 'lowpass';
+    const minFreq = 500;
+    const maxFreq = 10000;
+    toneFilter.frequency.value = minFreq + ampTone * (maxFreq - minFreq);
+    toneFilterRef.current = toneFilter;
+
+    // === SITAR SECTION ===
+    const sitarDryGain = ctx.createGain();
+    sitarDryGain.gain.value = 1 - sitarAmount;
+    sitarDryRef.current = sitarDryGain;
+
+    const sitarWetGain = ctx.createGain();
+    sitarWetGain.gain.value = sitarAmount;
+    sitarWetRef.current = sitarWetGain;
+
+    const sitarBandpass = ctx.createBiquadFilter();
+    sitarBandpass.type = 'bandpass';
+    const sitarSympathetic = ctx.createBiquadFilter();
+    sitarSympathetic.type = 'bandpass';
+    sitarBandpassRef.current = sitarBandpass;
+    sitarSympatheticRef.current = sitarSympathetic;
+
+    applySitarMode(sitarMode, {
+      sitarBandpass,
+      sitarSympathetic,
+    });
+
+    const sitarDrive = ctx.createWaveShaper();
+    sitarDrive.curve = makeDriveCurve(4.0);
+    sitarDrive.oversample = '4x';
+
+    const jawariDelay = ctx.createDelay(0.02);
+    jawariDelay.delayTime.value = 0.003;
+
+    const jawariFeedback = ctx.createGain();
+    jawariFeedback.gain.value = 0.35;
+
+    const sitarHighpass = ctx.createBiquadFilter();
+    sitarHighpass.type = 'highpass';
+    sitarHighpass.frequency.value = 1800;
+
+    // === DELAY & MIX ===
+    const preDelayGain = ctx.createGain();
+
+    const dryGain = ctx.createGain();
+    dryGain.gain.value = 1 - mixAmount;
+
+    const wetGain = ctx.createGain();
+    wetGain.gain.value = delayEnabled ? mixAmount : 0;
+    wetGainRef.current = wetGain;
+
+    const delayNode = ctx.createDelay(2.0);
+    delayNode.delayTime.value = delayTimeMs / 1000;
+    delayNodeRef.current = delayNode;
+
+    const feedbackGain = ctx.createGain();
+    feedbackGain.gain.value = feedbackAmount;
+    feedbackGainRef.current = feedbackGain;
+
+    // === MASTER & REVERB ===
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = ampMaster;
+    masterGainRef.current = masterGain;
+
+    const reverbDry = ctx.createGain();
+    const reverbWet = ctx.createGain();
+    reverbDry.gain.value = 1 - reverbAmount;
+    reverbWet.gain.value = reverbAmount;
+    reverbDryRef.current = reverbDry;
+    reverbWetRef.current = reverbWet;
+
+    const reverb = ctx.createConvolver();
+    reverb.buffer = getReverbImpulse(ctx);
+
+    const postFxGain = ctx.createGain();
+    postFxGainRef.current = postFxGain;
+
+    // === CONNECTIONS ===
+    // Guitar -> amp -> drive -> tone
+    guitarSource.connect(ampGainNode);
+    ampGainNode.connect(driveNode);
+    driveNode.connect(toneFilter);
+
+    // Sitar paths
+    toneFilter.connect(sitarDryGain);
+
+    toneFilter.connect(sitarBandpass);
+    sitarBandpass.connect(sitarDrive);
+    sitarDrive.connect(jawariDelay);
+    jawariDelay.connect(jawariFeedback);
+    jawariFeedback.connect(jawariDelay);
+    jawariDelay.connect(sitarHighpass);
+    sitarHighpass.connect(sitarWetGain);
+
+    toneFilter.connect(sitarSympathetic);
+    sitarSympathetic.connect(sitarWetGain);
+
+    // Mix dry + sitar into preDelay
+    sitarDryGain.connect(preDelayGain);
+    sitarWetGain.connect(preDelayGain);
+
+    // Delay network
+    preDelayGain.connect(dryGain);
+    preDelayGain.connect(delayNode);
+
+    delayNode.connect(wetGain);
+    delayNode.connect(feedbackGain);
+    feedbackGain.connect(delayNode);
+
+    // To master
+    dryGain.connect(masterGain);
+    wetGain.connect(masterGain);
+
+    // Reverb
+    masterGain.connect(reverbDry);
+    masterGain.connect(reverb);
+    reverb.connect(reverbWet);
+
+    reverbDry.connect(postFxGain);
+    reverbWet.connect(postFxGain);
+
+    // Monitor bus (to speakers controlled by monitorEnabled)
+    if (!monitorNodeRef.current) {
+      const monitorGain = ctx.createGain();
+      monitorGain.gain.value = 2;
+      monitorNodeRef.current = monitorGain;
+    }
+
+    postFxGain.connect(monitorNodeRef.current!);
+
+    // Si el monitor ya estaba encendido, conectamos ahora al destino
+    if (monitorEnabled) {
+      try {
+        monitorNodeRef.current!.connect(ctx.destination);
+      } catch {
+        // ignore si ya estaba conectado
+      }
+    }
+  }, [
+    audioContext,
+    ampGain,
+    ampMaster,
+    ampTone,
+    delayEnabled,
+    delayTimeMs,
+    driveAmount,
+    driveEnabled,
+    feedbackAmount,
+    mixAmount,
+    reverbAmount,
+    sitarAmount,
+    sitarMode,
+    getReverbImpulse,
+    monitorEnabled,
+  ]);
+
   // Entrada de guitarra
   const setupGuitarInput = useCallback(async () => {
     try {
@@ -255,13 +449,16 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
         guitarSourceRef.current = src;
       }
 
+      // Armamos el grafo de FX apenas tenemos la entrada
+      ensureGuitarGraph();
+
       setIsInputReady(true);
       setStatus('Entrada de guitarra lista ✅');
     } catch (err) {
       console.error(err);
       setStatus('Error al acceder al micrófono/placa');
     }
-  }, [getOrCreateAudioContext]);
+  }, [getOrCreateAudioContext, ensureGuitarGraph]);
 
   // Calcula forma de onda liviana
   const computeWaveform = (buffer: AudioBuffer): number[] => {
@@ -394,209 +591,59 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
     const destNode = recordingDestinationRef.current;
     const mediaRecorder = mediaRecorderRef.current;
-    const guitarSource = guitarSourceRef.current;
 
     if (!destNode || !mediaRecorder) {
       setStatus('No se pudo inicializar el grafo de audio');
       return;
     }
 
-    // Backing (opcional)
-    let backingSource: AudioBufferSourceNode | null = null;
-    if (backingBuffer) {
-      backingSource = ctx.createBufferSource();
-      backingSource.buffer = backingBuffer;
-    }
-    backingSourceRef.current = backingSource;
+    // Ensure main guitar FX graph exists
+    ensureGuitarGraph();
 
-    // Limpiamos conexiones previas de la guitarra
+    const postFxGain = postFxGainRef.current;
+    if (!postFxGain) {
+      setStatus('Error interno: grafo de guitarra no creado');
+      return;
+    }
+
+    // Connect post-FX signal to recording destination
+    if (!recordGainRef.current) {
+      const recordGain = ctx.createGain();
+      recordGain.gain.value = 1; // pequeño boost
+      recordGainRef.current = recordGain;
+    }
+
+    // Limpiamos conexiones previas hacia la salida de grabación
     try {
-      guitarSource.disconnect();
+      postFxGain.disconnect(recordGainRef.current);
+    } catch {
+      // ignore
+    }
+    try {
+      recordGainRef.current.disconnect(destNode);
     } catch {
       // ignore
     }
 
+    postFxGain.connect(recordGainRef.current);
+    recordGainRef.current.connect(destNode);
 
-    
-    // ======== CADENA DE GUITARRA (AMP + DRIVE + SITAR + DELAY + REVERB) ========
+    // ==== BACKING TRACK (opcional) ====
+    let backingSource: AudioBufferSourceNode | null = null;
+    if (backingBuffer) {
+      backingSource = ctx.createBufferSource();
+      backingSource.buffer = backingBuffer;
+      backingSourceRef.current = backingSource;
 
-    // Gain del ampli (input)
-    const ampGainNode = ctx.createGain();
-    ampGainNode.gain.value = ampGain; // 0..2
-
-    // Drive principal
-    const driveNode = ctx.createWaveShaper();
-    driveNode.curve = makeDriveCurve(driveEnabled ? driveAmount * 6 : 0);
-    driveNode.oversample = '4x';
-    driveNodeRef.current = driveNode;
-
-    // Tone del ampli: lowpass simple
-    const toneFilter = ctx.createBiquadFilter();
-    toneFilter.type = 'lowpass';
-    const minFreq = 500;
-    const maxFreq = 10000;
-    const freq = minFreq + ampTone * (maxFreq - minFreq); // 0..1
-    toneFilter.frequency.value = freq;
-
-    // Mix efectivo del delay (si está bypass)
-    const wetGain = ctx.createGain();
-    wetGain.gain.value = delayEnabled ? mixAmount : 0;
-    wetGainRef.current = wetGain;
-
-    const dryGain = ctx.createGain();
-    dryGain.gain.value = 1 - mixAmount;
-
-    const delay = ctx.createDelay(2.0);
-    delay.delayTime.value = delayTimeMs / 1000;
-
-    const feedbackGain = ctx.createGain();
-    feedbackGain.gain.value = feedbackAmount;
-
-    // Master previo a la reverb
-    const masterGain = ctx.createGain();
-    masterGain.gain.value = ampMaster;
-
-    // conexiones base:
-    // guitarra → ampGain → drive → tone
-    guitarSource.connect(ampGainNode);
-    ampGainNode.connect(driveNode);
-    driveNode.connect(toneFilter);
-
-    // ======== BLOQUE SITAR (más "india") ========
-
-    const sitarDryGain = ctx.createGain();
-    sitarDryGain.gain.value = 1 - sitarAmount;
-    sitarDryRef.current = sitarDryGain;
-
-    const sitarWetGain = ctx.createGain();
-    sitarWetGain.gain.value = sitarAmount;
-    sitarWetRef.current = sitarWetGain;
-
-    // 1) Resonador nasal principal
-    const sitarBandpass = ctx.createBiquadFilter();
-    sitarBandpass.type = 'bandpass';
-    sitarBandpass.frequency.value = 4000; // base, luego se ajusta por modo
-    sitarBandpass.Q.value = 5;
-    sitarBandpassRef.current = sitarBandpass;
-
-    // 2) Cuerdas simpáticas (resonancia fija más arriba)
-    const sitarSympathetic = ctx.createBiquadFilter();
-    sitarSympathetic.type = 'bandpass';
-    sitarSympathetic.frequency.value = 6500;
-    sitarSympathetic.Q.value = 8;
-    sitarSympatheticRef.current = sitarSympathetic;
-
-    // Aplicamos el modo inicial
-    applySitarMode(sitarMode, {
-      sitarBandpass,
-      sitarSympathetic,
-    });
-
-    // 3) Buzz jawari (distorsión suave + highpass + mini-delay)
-    const sitarDrive = ctx.createWaveShaper();
-    sitarDrive.curve = makeDriveCurve(4.0);
-    sitarDrive.oversample = '4x';
-
-    const jawariDelay = ctx.createDelay(0.01);
-    jawariDelay.delayTime.value = 0.003;
-
-    const jawariFeedback = ctx.createGain();
-    jawariFeedback.gain.value = 0.35;
-
-    const sitarHighpass = ctx.createBiquadFilter();
-    sitarHighpass.type = 'highpass';
-    sitarHighpass.frequency.value = 1800;
-
-    // RUTA SITAR:
-    // tone → (dry)
-    // tone → bandpass → drive → jawariDelay (con feedback) → highpass → Wet
-    // tone → sympathetic bandpass → Wet
-    toneFilter.connect(sitarDryGain);
-
-    toneFilter.connect(sitarBandpass);
-    sitarBandpass.connect(sitarDrive);
-    sitarDrive.connect(jawariDelay);
-    jawariDelay.connect(jawariFeedback);
-    jawariFeedback.connect(jawariDelay);
-    jawariDelay.connect(sitarHighpass);
-    sitarHighpass.connect(sitarWetGain);
-
-    toneFilter.connect(sitarSympathetic);
-    sitarSympathetic.connect(sitarWetGain);
-
-    // Mezcla previa al delay
-    const preDelayGain = ctx.createGain();
-    sitarDryGain.connect(preDelayGain);
-    sitarWetGain.connect(preDelayGain);
-
-    // De acá en adelante: delay
-    preDelayGain.connect(dryGain);
-    preDelayGain.connect(delay);
-
-    delay.connect(wetGain);
-    delay.connect(feedbackGain);
-    feedbackGain.connect(delay);
-
-    // dry+wet → master
-    dryGain.connect(masterGain);
-    wetGain.connect(masterGain);
-
-    // ======== REVERB (post master) ========
-
-    const reverbDry = ctx.createGain();
-    const reverbWet = ctx.createGain();
-    reverbDry.gain.value = 1 - reverbAmount;
-    reverbWet.gain.value = reverbAmount;
-    reverbDryRef.current = reverbDry;
-    reverbWetRef.current = reverbWet;
-
-    const reverb = ctx.createConvolver();
-    reverb.buffer = getReverbImpulse(ctx);
-
-    masterGain.connect(reverbDry);
-    masterGain.connect(reverb);
-    reverb.connect(reverbWet);
-
-    const postFxGain = ctx.createGain();
-    reverbDry.connect(postFxGain);
-    reverbWet.connect(postFxGain);
-     postFxGainRef.current = postFxGain; // 👈 guardamos el nodo final del ampli
-
-    // Master a la grabación (mono) con un poco más de gain
-    const recordGain = ctx.createGain();
-    recordGain.gain.value = 1.5; // ajustar si hace falta
-
-    postFxGain.connect(recordGain);
-    recordGain.connect(destNode);
-
-//  // ------ MONITOR CONTROLADO ------
-//     if (!monitorNodeRef.current) {
-//       monitorNodeRef.current = ctx.createGain();
-//     }
-
-//     // Conectar el postFx siempre a monitorNode
-//     postFxGain.connect(monitorNodeRef.current);
-
-//     // Si el monitor está encendido → enviar a parlantes
-//     if (monitorEnabled) {
-//       monitorNodeRef.current.connect(ctx.destination);
-//     } else {
-//       try {
-//         monitorNodeRef.current.disconnect(ctx.destination);
-//       } catch {}
-//     }
-
-    // ======== BACKING ========
-    // El backing solo va a los parlantes, NO a la grabación
-    if (backingSource) {
       const backingGain = ctx.createGain();
       backingGain.gain.value = 1.0;
-
       backingSource.connect(backingGain);
       backingGain.connect(ctx.destination);
+    } else {
+      backingSourceRef.current = null;
     }
 
-    // arranca grabación + playback
+    // Iniciamos la grabación
     recordedChunksRef.current = [];
     mediaRecorder.start();
 
@@ -628,24 +675,12 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       setStatus('Grabando (sin backing)... 🔴');
     }
   }, [
-    ampGain,
-    ampMaster,
-    ampTone,
-    backingBuffer,
-    delayEnabled,
-    delayTimeMs,
-    driveAmount,
-    driveEnabled,
-    feedbackAmount,
-    getOrCreateAudioContext,
-    getReverbImpulse,
     isInputReady,
-    mixAmount,
+    backingBuffer,
+    ensureGuitarGraph,
+    getOrCreateAudioContext,
     setupRecordingGraph,
-    sitarAmount,
-    sitarMode,
     startProgressAnimation,
-    reverbAmount,
   ]);
 
   const stopRecording = useCallback(() => {
@@ -663,6 +698,20 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.stop();
+    }
+
+    // Desconectar envío a la salida de grabación
+    if (postFxGainRef.current && recordGainRef.current && recordingDestinationRef.current) {
+      try {
+        postFxGainRef.current.disconnect(recordGainRef.current);
+      } catch {
+        // ignore
+      }
+      try {
+        recordGainRef.current.disconnect(recordingDestinationRef.current);
+      } catch {
+        // ignore
+      }
     }
 
     setIsRecording(false);
@@ -701,61 +750,82 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     }
   }, [delayEnabled, mixAmount, audioContext]);
 
-
-  // useEffect(() => {
-  //   if (!audioContext || !monitorNodeRef.current) return;
-
-  //   if (monitorEnabled) {
-  //     try {
-  //       monitorNodeRef.current.connect(audioContext.destination);
-  //     } catch {}
-  //   } else {
-  //     try {
-  //       monitorNodeRef.current.disconnect(audioContext.destination);
-  //     } catch {}
-  //   }
-  // }, [monitorEnabled, audioContext]);
-
-  // MONITOR EN VIVO: cuando monitorEnabled = true y NO estamos grabando,
-  // armamos la misma cadena del ampli sólo para escuchar.
-   // MONITOR: usa el MISMO grafo que se arma para grabar (postFxGainRef)
+  // Delay time & feedback
   useEffect(() => {
     if (!audioContext) return;
-    if (!postFxGainRef.current) return; // aún no se armó el grafo
-
-    if (!monitorNodeRef.current) {
-      monitorNodeRef.current = audioContext.createGain();
-      monitorNodeRef.current.gain.value = 1;
+    if (delayNodeRef.current) {
+      delayNodeRef.current.delayTime.setTargetAtTime(
+        delayTimeMs / 1000,
+        audioContext.currentTime,
+        0.01,
+      );
     }
+    if (feedbackGainRef.current) {
+      feedbackGainRef.current.gain.setTargetAtTime(
+        feedbackAmount,
+        audioContext.currentTime,
+        0.01,
+      );
+    }
+  }, [delayTimeMs, feedbackAmount, audioContext]);
 
-    const postFx = postFxGainRef.current;
-    const monitorNode = monitorNodeRef.current;
+  // Amp gain / tone / master
+  useEffect(() => {
+    if (!audioContext) return;
+    if (ampGainNodeRef.current) {
+      ampGainNodeRef.current.gain.setTargetAtTime(
+        ampGain,
+        audioContext.currentTime,
+        0.01,
+      );
+    }
+  }, [ampGain, audioContext]);
 
-    // asegurar conexión postFx → monitorNode
-    try {
-      postFx.disconnect(monitorNode);
-    } catch {}
-    postFx.connect(monitorNode);
+  useEffect(() => {
+    if (!audioContext) return;
+    if (toneFilterRef.current) {
+      const minFreq = 500;
+      const maxFreq = 10000;
+      const freq = minFreq + ampTone * (maxFreq - minFreq);
+      toneFilterRef.current.frequency.setTargetAtTime(
+        freq,
+        audioContext.currentTime,
+        0.01,
+      );
+    }
+  }, [ampTone, audioContext]);
+
+  useEffect(() => {
+    if (!audioContext) return;
+    if (masterGainRef.current) {
+      masterGainRef.current.gain.setTargetAtTime(
+        ampMaster,
+        audioContext.currentTime,
+        0.01,
+      );
+    }
+  }, [ampMaster, audioContext]);
+
+  // Monitor on/off
+  useEffect(() => {
+    if (!audioContext) return;
+    if (!monitorNodeRef.current) return;
+    const node = monitorNodeRef.current;
 
     if (monitorEnabled) {
       try {
-        monitorNode.connect(audioContext.destination);
-      } catch {}
+        node.connect(audioContext.destination);
+      } catch {
+        // already connected
+      }
     } else {
       try {
-        monitorNode.disconnect(audioContext.destination);
-      } catch {}
+        node.disconnect(audioContext.destination);
+      } catch {
+        // ignore
+      }
     }
-
-    // cleanup por si React desmonta / cambia algo
-    return () => {
-      try {
-        monitorNode.disconnect(audioContext.destination);
-      } catch {}
-    };
   }, [monitorEnabled, audioContext]);
-
-
 
   // Sitar amount
   useEffect(() => {
