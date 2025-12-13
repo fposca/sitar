@@ -5,6 +5,7 @@ import GuitarInputPanel from './components/GuitarInputPanel';
 import DelayPanel from './components/DelayPanel';
 import RecordingPanel from './components/RecordingPanel';
 import AmpPanel from './components/AmpPanel';
+import neonboy from '../src/assets/neonboy.png';
 
 const NeonSitarLayout: React.FC = () => {
   const { status } = useAudioEngine();
@@ -37,9 +38,11 @@ const NeonSitarLayout: React.FC = () => {
               fontWeight: 700,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
+              position:'absolute',
+              right:'15%'
             }}
           >
-            NeonBoy Sitar – MVP + Delay
+          <img style={{width: '250px'}} src={neonboy}></img>
           </h1>
           <p style={{ opacity: 0.8, marginTop: '0.25rem' }}>{status}</p>
         </header>

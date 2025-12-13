@@ -40,3 +40,31 @@
 .read-the-docs {
   color: #888;
 }
+.rec-indicator {
+  display: flex;
+  align-items: center;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: #ff4d4d;
+  font-weight: 600;
+  gap: 0.4rem;
+}
+
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ff4d4d;
+  animation: rec-blink 1s infinite;
+}
+
+@keyframes rec-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0.15;
+  }
+}

@@ -14,7 +14,7 @@ const labelStyle: React.CSSProperties = {
 const valueStyle: React.CSSProperties = {
   fontSize: '0.7rem',
   opacity: 0.75,
-  color: '#111827',
+  color: '#161616ff',
 };
 
 type KnobProps = {
@@ -39,7 +39,7 @@ const Knob: React.FC<KnobProps> = ({ label, min, max, value, onChange, display }
         gap: '0.35rem',
       }}
     >
-      <span style={{ ...labelStyle, color: '#111827' }}>{label}</span>
+      <span style={{ ...labelStyle, color: '#000000ff' }}>{label}</span>
 
       {/* knob visual */}
       <div
@@ -109,9 +109,18 @@ const AmpPanel: React.FC = () => {
     setReverbAmount,
     sitarMode,
     setSitarMode,
-    // 👇 acá traemos también el monitor desde el contexto
+    // Monitor
     monitorEnabled,
     setMonitorEnabled,
+    // Tonestack
+    bassAmount,
+    setBassAmount,
+    midAmount,
+    setMidAmount,
+    trebleAmount,
+    setTrebleAmount,
+    presenceAmount,
+    setPresenceAmount,
   } = useAudioEngine();
 
   const modeLabels: Record<SitarMode, string> = {
@@ -143,11 +152,12 @@ const AmpPanel: React.FC = () => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '1rem',
+          marginBottom: '0rem',
+                        maxWidth: '100px',
         }}
       >
         <div>
-          <div
+          {/* <div
             style={{
               fontSize: '0.7rem',
               textTransform: 'uppercase',
@@ -156,8 +166,8 @@ const AmpPanel: React.FC = () => {
             }}
           >
             NeonBoy
-          </div>
-          <div
+          </div> */}
+          {/* <div
             style={{
               fontSize: '1rem',
               fontWeight: 700,
@@ -166,7 +176,7 @@ const AmpPanel: React.FC = () => {
             }}
           >
             Sitar Amp
-          </div>
+          </div> */}
         </div>
 
         <div
@@ -174,6 +184,7 @@ const AmpPanel: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '0.6rem',
+
           }}
         >
           <div
@@ -188,6 +199,7 @@ const AmpPanel: React.FC = () => {
               alignItems: 'center',
               gap: '0.4rem',
               background: '#020617',
+              marginBottom: '10px'
             }}
           >
             <span
@@ -206,21 +218,18 @@ const AmpPanel: React.FC = () => {
 
       {/* Cabezál + mesa */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Mesa de madera */}
-        
-
         {/* Amp head */}
         <div
           style={{
             marginTop: -2,
             marginInline: '1.5rem',
             width: '100%',
-            maxWidth:'1500px',
+            maxWidth: '1500px',
             borderRadius: '18px',
             overflow: 'hidden',
-            border: '2px solid #020617',
+            border: '2px solid #dfcbbf',
             background:
-              'linear-gradient(180deg,#1f2937 0,#020617 40%,#020617 100%)',
+              'linear-gradient(180deg,#dfcbbf 0,#dfcbbf 40%,#020617 100%)',
           }}
         >
           {/* Manija superior */}
@@ -255,8 +264,7 @@ const AmpPanel: React.FC = () => {
             {/* Rejilla / grill */}
             <div
               style={{
-                background:
-                  'linear-gradient(135deg,#000 0,#000 40%,#000 100%)',
+                backgroundColor:'#dfcbbf',
                 display: 'flex',
                 height: '638px',
                 alignItems: 'stretch',
@@ -275,39 +283,41 @@ const AmpPanel: React.FC = () => {
               />
             </div>
 
-            {/* Panel de controles beige */}
+            {/* Panel de controles */}
             <div
               style={{
                 backgroundImage: `url(${input})`,
                 backgroundSize: 'cover',
+                backgroundRepeat: 'no-repeat',
                 padding: '0.75rem 1.1rem 0.8rem',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '0.7rem',
               }}
             >
-              {/* Preset + logo */}
+              {/* Preset + logo + switches */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   marginBottom: '0.3rem',
+                  gap: '0.75rem',
                 }}
               >
                 <div>
-                  <div style={{ ...labelStyle, color: '#4b5563' }}>Preset</div>
+                  <div style={{ ...labelStyle, color: '#ff07c9ff' }}>&nbsp;</div>
                   <div
                     style={{
                       fontSize: '0.9rem',
                       fontWeight: 600,
-                      color: '#111827',
+                      color: '#f700ffff',
                     }}
                   >
-                    Neon Raga
+                    &nbsp;
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#4b5563' }}>
-                    Sitar ambience
+                  <div style={{ fontSize: '0.75rem', color: '#ffffffff' }}>
+                    &nbsp;
                   </div>
                 </div>
 
@@ -316,14 +326,16 @@ const AmpPanel: React.FC = () => {
                     alignSelf: 'flex-end',
                     padding: '0.1rem 0.5rem',
                     borderRadius: '999px',
-                    border: '1px solid #111827',
+                    border: '1px solid #ff02c8ff',
                     fontSize: '0.65rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.18em',
-                    color: '#111827',
+                    color: '#3660b9ff',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.3rem',
+                    position: 'relative',
+                    top: '-15px',
                   }}
                 >
                   <span
@@ -331,7 +343,7 @@ const AmpPanel: React.FC = () => {
                       width: 8,
                       height: 8,
                       borderRadius: '999px',
-                      background: '#111827',
+                      background: '#3660b9ff',
                     }}
                   />
                   NB • SITAR
@@ -343,17 +355,80 @@ const AmpPanel: React.FC = () => {
                   onClick={() => setMonitorEnabled(!monitorEnabled)}
                   style={{
                     padding: '8px 14px',
-                    background: monitorEnabled ? '#10b981' : '#ef4444',
-                    color: 'white',
-                    borderRadius: 6,
+                    background: monitorEnabled ? '#fa95c8' : '#a0a0a0ff',
+                    color: 'black',
+        
                     border: 'none',
                     cursor: 'pointer',
                     fontSize: '0.7rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.12em',
+                    borderRadius: '999px',
+                     boxShadow: driveEnabled
+                      ? '0 0 10px rgba(250, 110, 231, 0.8)'
+                      : 'none',
                   }}
                 >
                   {monitorEnabled ? 'Monitor ON' : 'Monitor OFF'}
+                </button>
+
+                {/* Drive ON/OFF */}
+                <button
+                  type="button"
+                  onClick={() => setDriveEnabled(!driveEnabled)}
+                  style={{
+                    padding: '0.35rem 1.4rem',
+                    borderRadius: '999px',
+                    border: 'none',
+                    fontSize: '0.7rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.16em',
+                    background: driveEnabled ? '#fa95c8' : '#959596ff',
+                    color: '#f9fafb',
+                    cursor: 'pointer',
+                    boxShadow: driveEnabled
+                      ? '0 0 10px rgba(250, 110, 231, 0.8)'
+                      : 'none',
+                  }}
+                >
+                  {driveEnabled ? 'Drive On' : 'Drive Off'}
+                </button>
+
+                {/* Delay footswitch */}
+                <button
+                  type="button"
+                  onClick={() => setDelayEnabled(!delayEnabled)}
+                  style={{
+                    padding: '0.45rem 1.4rem',
+                    borderRadius: '999px',
+                    border: delayEnabled
+                      ? '1px solid #fa95c8'
+                      : '1px solid #9ca3af',
+                    background: delayEnabled
+                      ? '#fa95c8'
+                      : 'transparent',
+                    color: delayEnabled ? '#022c22' : '#111827',
+                    fontSize: '0.7rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.16em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    cursor: 'pointer',
+                    boxShadow: delayEnabled
+                      ? '0 0 18px rgba(245, 5, 137, 0.7)'
+                      : 'none',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: '999px',
+                      background: delayEnabled ? '#fd007fff' : '#9ca3af',
+                    }}
+                  />
+                  {delayEnabled ? 'Delay On' : 'Delay Off'}
                 </button>
               </div>
 
@@ -363,6 +438,7 @@ const AmpPanel: React.FC = () => {
                   display: 'flex',
                   gap: '0.4rem',
                   marginBottom: '0.4rem',
+                  marginLeft: '226px',
                 }}
               >
                 {(Object.keys(modeLabels) as SitarMode[]).map((mode) => {
@@ -378,7 +454,9 @@ const AmpPanel: React.FC = () => {
                         textTransform: 'uppercase',
                         letterSpacing: '0.12em',
                         borderRadius: 999,
-                        border: active ? '1px solid #1d4ed8' : '1px solid #d4d4d8',
+                        border: active
+                          ? '1px solid #1d4ed8'
+                          : '1px solid #d4d4d8',
                         background: active
                           ? 'linear-gradient(90deg,#60a5fa,#2563eb)'
                           : '#f4f4f5',
@@ -399,8 +477,10 @@ const AmpPanel: React.FC = () => {
                   gap: '1.8rem',
                   justifyContent: 'flex-start',
                   flexWrap: 'wrap',
+                  marginLeft: '201px',
                 }}
               >
+                {/* Fila 1: Gain / Bass / Mid / Treble */}
                 <Knob
                   label="Gain"
                   min={0}
@@ -408,6 +488,43 @@ const AmpPanel: React.FC = () => {
                   value={ampGain * 100}
                   onChange={(v) => setAmpGain(v / 100)}
                   display={ampGain.toFixed(2)}
+                />
+
+                <Knob
+                  label="Bass"
+                  min={0}
+                  max={100}
+                  value={bassAmount * 100}
+                  onChange={(v) => setBassAmount(v / 100)}
+                  display={`${Math.round(bassAmount * 10)}/10`}
+                />
+
+                <Knob
+                  label="Mid"
+                  min={0}
+                  max={100}
+                  value={midAmount * 100}
+                  onChange={(v) => setMidAmount(v / 100)}
+                  display={`${Math.round(midAmount * 10)}/10`}
+                />
+
+                <Knob
+                  label="Treble"
+                  min={0}
+                  max={100}
+                  value={trebleAmount * 100}
+                  onChange={(v) => setTrebleAmount(v / 100)}
+                  display={`${Math.round(trebleAmount * 10)}/10`}
+                />
+
+                {/* Fila 2: Presence / Tone / Sitar / Master / Drive / Reverb */}
+                <Knob
+                  label="Presence"
+                  min={0}
+                  max={100}
+                  value={presenceAmount * 100}
+                  onChange={(v) => setPresenceAmount(v / 100)}
+                  display={`${Math.round(presenceAmount * 10)}/10`}
                 />
 
                 <Knob
@@ -454,73 +571,6 @@ const AmpPanel: React.FC = () => {
                   onChange={(v) => setReverbAmount(v / 100)}
                   display={`${Math.round(reverbAmount * 100)}%`}
                 />
-              </div>
-
-              {/* Footswitches */}
-              <div
-                style={{
-                  marginTop: '0.8rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                {/* Drive ON/OFF */}
-                <button
-                  type="button"
-                  onClick={() => setDriveEnabled(!driveEnabled)}
-                  style={{
-                    padding: '0.35rem 1.4rem',
-                    borderRadius: '999px',
-                    border: 'none',
-                    fontSize: '0.7rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.16em',
-                    background: driveEnabled ? '#111827' : '#6b7280',
-                    color: '#f9fafb',
-                    cursor: 'pointer',
-                    boxShadow: driveEnabled
-                      ? '0 0 10px rgba(15,23,42,0.8)'
-                      : 'none',
-                  }}
-                >
-                  {driveEnabled ? 'Drive On' : 'Drive Off'}
-                </button>
-
-                {/* Delay footswitch */}
-                <button
-                  type="button"
-                  onClick={() => setDelayEnabled(!delayEnabled)}
-                  style={{
-                    padding: '0.45rem 1.4rem',
-                    borderRadius: '999px',
-                    border: delayEnabled ? '1px solid #16a34a' : '1px solid #9ca3af',
-                    background: delayEnabled
-                      ? 'radial-gradient(circle at 30% 0,#4ade80 0,#16a34a 50%,#166534 100%)'
-                      : 'transparent',
-                    color: delayEnabled ? '#022c22' : '#111827',
-                    fontSize: '0.7rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.16em',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.45rem',
-                    cursor: 'pointer',
-                    boxShadow: delayEnabled
-                      ? '0 0 18px rgba(34,197,94,0.7)'
-                      : 'none',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: '999px',
-                      background: delayEnabled ? '#bbf7d0' : '#9ca3af',
-                    }}
-                  />
-                  {delayEnabled ? 'Delay On' : 'Delay Off'}
-                </button>
               </div>
             </div>
           </div>
