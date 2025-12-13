@@ -1,0 +1,25 @@
+/* Reset básico */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Fondo general de la app */
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #020617;           /* mismo fondo oscuro que usamos en la app */
+  color: #f5f5f5;
+  font-family: system-ui, sans-serif;
+}
+
+/* El root ocupa todo el ancho y alto */
+#root {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;                    /* el padding ya lo maneja NeonSitarLayout */
+}
