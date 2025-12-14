@@ -128,6 +128,60 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     return ctx;
   }, [audioContext]);
 
+  // 🔹 METRÓNOMO
+  const [metronomeOn, setMetronomeOn] = useState(false);
+  const [bpm, setBpm] = useState(120);
+  const [metronomeVolume, setMetronomeVolume] = useState(0.15); // volumen inicial
+  const metronomeIntervalRef = useRef<number | null>(null);
+
+  const startMetronome = useCallback(() => {
+    if (!audioContext) return;
+    setMetronomeOn(true);
+  }, [audioContext]);
+
+  const stopMetronome = useCallback(() => {
+    setMetronomeOn(false);
+  }, []);
+
+  // crear / actualizar intervalo del metrónomo
+  useEffect(() => {
+    if (!audioContext) return;
+
+    if (!metronomeOn) {
+      if (metronomeIntervalRef.current != null) {
+        clearInterval(metronomeIntervalRef.current);
+        metronomeIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const effectiveBpm = bpm <= 0 ? 1 : bpm;
+    const intervalMs = (60 / effectiveBpm) * 1000;
+
+    const tick = () => {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      gain.gain.value = metronomeVolume; // volumen configurable
+      osc.type = 'square';
+      osc.frequency.value = 1000;
+      osc.connect(gain).connect(audioContext.destination);
+      osc.start();
+      osc.stop(audioContext.currentTime + 0.05);
+    };
+
+    // primer click inmediato
+    tick();
+
+    metronomeIntervalRef.current = window.setInterval(tick, intervalMs);
+
+    return () => {
+      if (metronomeIntervalRef.current != null) {
+        clearInterval(metronomeIntervalRef.current);
+        metronomeIntervalRef.current = null;
+      }
+    };
+  }, [audioContext, bpm, metronomeOn, metronomeVolume]);
+
   // simple IR para reverb (ruido con decay)
   const getReverbImpulse = useCallback(
     (ctx: AudioContext): AudioBuffer => {
@@ -877,6 +931,15 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     isInputReady,
     isRecording,
     hasBacking: !!backingBuffer,
+
+    // 🔹 Metronome
+    bpm,
+    setBpm,
+    metronomeOn,
+    startMetronome,
+    stopMetronome,
+    metronomeVolume,
+    setMetronomeVolume,
 
     backingName,
     backingWaveform,

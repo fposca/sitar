@@ -8,6 +8,15 @@ export type AudioEngineContextValue = {
   isRecording: boolean;
   hasBacking: boolean;
 
+   // 🔹 Metronome
+ bpm: number;
+  setBpm: (v: number) => void;
+  metronomeOn: boolean;
+  startMetronome: () => void;
+  stopMetronome: () => void;
+  metronomeVolume: number;
+  setMetronomeVolume: (v: number) => void;
+
   backingName: string | null;
   backingWaveform: number[] | null;
   playbackProgress: number; // 0..1
