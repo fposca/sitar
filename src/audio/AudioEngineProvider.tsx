@@ -7,159 +7,10 @@ import React, {
   useRef,
   useState,
 } from 'react';
-
-export type SitarMode = 'sharp' | 'major' | 'minor' | 'exotic';
-
-type AudioEngineContextValue = {
-  status: string;
-  isInputReady: boolean;
-  isRecording: boolean;
-  hasBacking: boolean;
-
-  backingName: string | null;
-  backingWaveform: number[] | null;
-  playbackProgress: number; // 0..1
-
-  // Delay
-  delayTimeMs: number;
-  setDelayTimeMs: (value: number) => void;
-  feedbackAmount: number;
-  setFeedbackAmount: (value: number) => void;
-  mixAmount: number;
-  setMixAmount: (value: number) => void;
-
-  // Controles de ampli
-  ampGain: number; // 0..2 aprox
-  setAmpGain: (value: number) => void;
-  ampTone: number; // 0..1
-  setAmpTone: (value: number) => void;
-  ampMaster: number; // 0..2
-  setAmpMaster: (value: number) => void;
-
-  // Tonestack
-  bassAmount: number;
-  setBassAmount: (v: number) => void;
-  midAmount: number;
-  setMidAmount: (v: number) => void;
-  trebleAmount: number;
-  setTrebleAmount: (v: number) => void;
-
-  // Presence
-  presenceAmount: number;
-  setPresenceAmount: (v: number) => void;
-
-  // Delay bypass
-  delayEnabled: boolean;
-  setDelayEnabled: (value: boolean) => void;
-
-  // Efecto sitar (0 = apagado, 1 = máximo)
-  sitarAmount: number;
-  setSitarAmount: (value: number) => void;
-
-  // Modo del sitar (sharp/major/minor/exotic)
-  sitarMode: SitarMode;
-  setSitarMode: (mode: SitarMode) => void;
-
-  // Distorsión
-  driveAmount: number; // 0..1
-  setDriveAmount: (value: number) => void;
-  driveEnabled: boolean;
-  setDriveEnabled: (value: boolean) => void;
-
-  // Reverb
-  reverbAmount: number; // 0..1
-  setReverbAmount: (value: number) => void;
-
-  // Monitor
-  monitorEnabled: boolean;
-  setMonitorEnabled: (v: boolean) => void;
-
-  // Tiempo grabando (en segundos)
-  recordingSeconds: number;
-
-  // Acciones
-  setupGuitarInput: () => Promise<void>;
-  loadBackingFile: (file: File) => Promise<void>;
-  startPlaybackAndRecording: () => Promise<void>;
-  stopRecording: () => void;
-};
+import type { AudioEngineContextValue, SitarMode } from './audioTypes';
+import { applySitarMode, makeDriveCurve, computeWaveform } from './audioDSP';
 
 const AudioEngineContext = createContext<AudioEngineContextValue | null>(null);
-
-// helper simple para saturación tipo drive
-const makeDriveCurve = (amount: number) => {
-  const k = amount;
-  const n = 256;
-  const curve = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const x = (i * 2) / n - 1;
-    curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
-  }
-  return curve;
-};
-
-// Ajusta la respuesta “india” según el modo elegido
-const applySitarMode = (
-  mode: SitarMode,
-  nodes: {
-    sitarBandpass: BiquadFilterNode;
-    sitarSympathetic: BiquadFilterNode;
-    jawariDrive: WaveShaperNode;
-    jawariHighpass: BiquadFilterNode;
-  },
-) => {
-  switch (mode) {
-    case 'sharp': {
-      // cuasi eléctrico, ultra brillante
-      nodes.sitarBandpass.frequency.value = 5000;
-      nodes.sitarBandpass.Q.value = 10;
-
-      nodes.sitarSympathetic.frequency.value = 7800;
-      nodes.sitarSympathetic.Q.value = 18;
-
-      nodes.jawariHighpass.frequency.value = 2600;
-      nodes.jawariDrive.curve = makeDriveCurve(5.0);
-      break;
-    }
-    case 'major': {
-      // abierto, acústico, menos nasal
-      nodes.sitarBandpass.frequency.value = 3200;
-      nodes.sitarBandpass.Q.value = 4;
-
-      nodes.sitarSympathetic.frequency.value = 5200;
-      nodes.sitarSympathetic.Q.value = 6;
-
-      nodes.jawariHighpass.frequency.value = 1800;
-      nodes.jawariDrive.curve = makeDriveCurve(3.2);
-      break;
-    }
-    case 'minor': {
-      // oscuro, fúnebre, rollo “lamento indio”
-      nodes.sitarBandpass.frequency.value = 2400;
-      nodes.sitarBandpass.Q.value = 7;
-
-      nodes.sitarSympathetic.frequency.value = 4000;
-      nodes.sitarSympathetic.Q.value = 10;
-
-      nodes.jawariHighpass.frequency.value = 900;
-      nodes.jawariDrive.curve = makeDriveCurve(2.5);
-      break;
-    }
-    case 'exotic':
-    default: {
-      // loco, exagerado, muy “India profunda”
-      nodes.sitarBandpass.frequency.value = 4200;
-      nodes.sitarBandpass.Q.value = 14;
-
-      nodes.sitarSympathetic.frequency.value = 9500;
-      nodes.sitarSympathetic.Q.value = 20;
-
-      nodes.jawariHighpass.frequency.value = 3000;
-      nodes.jawariDrive.curve = makeDriveCurve(7.0);
-      break;
-    }
-  }
-};
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useAudioEngine = () => {
@@ -167,6 +18,9 @@ export const useAudioEngine = () => {
   if (!ctx) throw new Error('useAudioEngine debe usarse dentro de AudioEngineProvider');
   return ctx;
 };
+
+// re-export de tipos para que puedas seguir importando desde este archivo
+export type { SitarMode } from './audioTypes';
 
 type Props = {
   children: React.ReactNode;
@@ -196,8 +50,8 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [ampMaster, setAmpMaster] = useState(1.0);
 
   // Tonestack
-  const [bassAmount, setBassAmount] = useState(0.5);   // 0..1
-  const [midAmount, setMidAmount] = useState(0.5);     // 0..1
+  const [bassAmount, setBassAmount] = useState(0.5); // 0..1
+  const [midAmount, setMidAmount] = useState(0.5); // 0..1
   const [trebleAmount, setTrebleAmount] = useState(0.5); // 0..1
   const [presenceAmount, setPresenceAmount] = useState(0.5); // 0..1
 
@@ -560,29 +414,6 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       setStatus('Error al acceder al micrófono/placa');
     }
   }, [getOrCreateAudioContext, ensureGuitarGraph]);
-
-  // Calcula forma de onda liviana
-  const computeWaveform = (buffer: AudioBuffer): number[] => {
-    const channelData = buffer.getChannelData(0);
-    const samples = 400;
-    const blockSize = Math.max(1, Math.floor(channelData.length / samples));
-    const waveform: number[] = [];
-
-    for (let i = 0; i < samples; i++) {
-      const start = i * blockSize;
-      const end = Math.min(start + blockSize, channelData.length);
-      let peak = 0;
-
-      for (let j = start; j < end; j++) {
-        const v = Math.abs(channelData[j]);
-        if (v > peak) peak = v;
-      }
-
-      waveform.push(peak);
-    }
-
-    return waveform;
-  };
 
   // Cargar backing
   const loadBackingFile = useCallback(

@@ -1,20 +1,29 @@
 // src/components/AmpPanel.tsx
 import React, { useState } from 'react';
 import { useAudioEngine, type SitarMode } from '../audio/AudioEngineProvider';
-import neonImg from '../assets/nea.png';
-import input from '../assets/input.png';
 
-const labelStyle: React.CSSProperties = {
+// CLEAN (rosa)
+import cleanFrontImg from '../assets/nea.png';
+import cleanPanelImg from '../assets/input.png';
+
+// LEAD (equipo oscuro)
+import leadFrontImg from '../assets/nea-lead.png';
+import leadPanelImg from '../assets/input-lead.png';
+
+// INFERNAL (equipo oscuro rosa)
+import infernalFrontImg from '../assets/nea-infernal.png';
+import infernalPanelImg from '../assets/input-infernal.png';
+
+const labelBase: React.CSSProperties = {
   fontSize: '0.7rem',
   textTransform: 'uppercase',
   letterSpacing: '0.12em',
   opacity: 0.8,
 };
 
-const valueStyle: React.CSSProperties = {
+const valueBase: React.CSSProperties = {
   fontSize: '0.7rem',
   opacity: 0.75,
-  color: '#ffffffff',
 };
 
 type KnobProps = {
@@ -24,9 +33,22 @@ type KnobProps = {
   value: number;
   onChange: (v: number) => void;
   display: string;
+  labelColor: string;
+  valueColor: string;
+  faceGradient: string;
 };
 
-const Knob: React.FC<KnobProps> = ({ label, min, max, value, onChange, display }) => {
+const Knob: React.FC<KnobProps> = ({
+  label,
+  min,
+  max,
+  value,
+  onChange,
+  display,
+  labelColor,
+  valueColor,
+  faceGradient,
+}) => {
   const percent = (value - min) / (max - min);
 
   return (
@@ -39,7 +61,7 @@ const Knob: React.FC<KnobProps> = ({ label, min, max, value, onChange, display }
         gap: '0.35rem',
       }}
     >
-      <span style={{ ...labelStyle, color: '#ffffffff' }}>{label}</span>
+      <span style={{ ...labelBase, color: labelColor }}>{label}</span>
 
       {/* knob visual */}
       <div
@@ -48,8 +70,7 @@ const Knob: React.FC<KnobProps> = ({ label, min, max, value, onChange, display }
           width: 46,
           height: 46,
           borderRadius: '999px',
-          background:
-            'radial-gradient(circle at 30% 20%, #ffffff 0, #e5e7eb 35%, #9ca3af 100%)',
+          background: faceGradient,
           boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
           display: 'flex',
           alignItems: 'center',
@@ -84,7 +105,7 @@ const Knob: React.FC<KnobProps> = ({ label, min, max, value, onChange, display }
         />
       </div>
 
-      <span style={valueStyle}>{display}</span>
+      <span style={{ ...valueBase, color: valueColor }}>{display}</span>
     </div>
   );
 };
@@ -188,6 +209,237 @@ const PRESETS: Record<
   },
 };
 
+/* ---------- SKINS VISUALES POR PRESET ---------- */
+
+const SKINS: Record<
+  PresetId,
+  {
+    frontImg: string;
+    panelImg: string;
+    grillBg: string;
+
+    // perillas
+    knobLabelColor: string;
+    knobValueColor: string;
+    knobFaceGradient: string;
+
+    // modos SHARP / MAJOR / MINOR / EXOTIC
+    modeActiveBg: string;
+    modeActiveBorder: string;
+    modeActiveColor: string;
+    modeInactiveBg: string;
+    modeInactiveColor: string;
+
+    // tarjeta de preset
+    presetPanelBg: string;
+    presetLabelColor: string;
+    presetNameColor: string;
+    presetDescColor: string;
+
+    // chips de preset
+    presetChipActiveBg: string;
+    presetChipActiveBorder: string;
+    presetChipActiveColor: string;
+    presetChipInactiveBg: string;
+    presetChipInactiveBorder: string;
+    presetChipInactiveColor: string;
+
+    // badge NB • SITAR
+    nbBadgeBg: string;
+    nbBadgeBorder: string;
+    nbBadgeTextColor: string;
+    nbBadgeDotBg: string;
+
+    // botones de monitor
+    monitorOnBg: string;
+    monitorOffBg: string;
+    monitorTextColor: string;
+
+    // botones de drive
+    driveOnBg: string;
+    driveOffBg: string;
+    driveTextColor: string;
+
+    // botón de delay
+    delayOnBg: string;
+    delayOffBg: string;
+    delayOnBorder: string;
+    delayOffBorder: string;
+    delayOnDotBg: string;
+    delayOffDotBg: string;
+    delayOnTextColor: string;
+    delayOffTextColor: string;
+
+    // sombras unificadas controles (monitor / drive / delay)
+    controlOnShadow: string;
+    controlOffShadow: string;
+  }
+> = {
+  cleanMystic: {
+    frontImg: cleanFrontImg,
+    panelImg: cleanPanelImg,
+    grillBg: '#f2d8d4', // rosa claro
+
+    knobLabelColor: '#111827',
+    knobValueColor: '#111827',
+    knobFaceGradient:
+      'radial-gradient(circle at 30% 20%, #ffffff 0, #ffe4e6 35%, #f9a8d4 100%)',
+
+    modeActiveBg: 'linear-gradient(90deg,#fb37ff,#ec4899)',
+    modeActiveBorder: '1px solid #fb37ff',
+    modeActiveColor: '#f9fafb',
+    modeInactiveBg: '#ffe4e6',
+    modeInactiveColor: '#111827',
+
+    presetPanelBg: '#edd9cdb8',
+    presetLabelColor: '#fb37ff',
+    presetNameColor: '#f700ff',
+    presetDescColor: '#131313ff',
+
+    presetChipActiveBg: 'linear-gradient(90deg,#fb37ff,#ec4899)',
+    presetChipActiveBorder: '1px solid #fb37ff',
+    presetChipActiveColor: '#f9fafb',
+    presetChipInactiveBg: '#111827aa',
+    presetChipInactiveBorder: '1px solid #9ca3af',
+    presetChipInactiveColor: '#e5e7eb',
+
+    nbBadgeBg: '#ffd3e680',
+    nbBadgeBorder: '1px solid #ff02c8ff',
+    nbBadgeTextColor: '#ffffffff',
+    nbBadgeDotBg: '#ff4fd8',
+
+    monitorOnBg: '#fe98d1',
+    monitorOffBg: '#e5e7eb',
+    monitorTextColor: '#111827',
+
+    driveOnBg: '#fe98d1',
+    driveOffBg: '#d3d3d3ff',
+    driveTextColor: '#f9fafb',
+
+    // delay verde clásico en el clean
+    delayOnBg:
+      'radial-gradient(circle at 30% 0,#4ade80 0,#16a34a 50%,#166534 100%)',
+    delayOffBg: 'transparent',
+    delayOnBorder: '1px solid #16a34a',
+    delayOffBorder: '1px solid #9ca3af',
+    delayOnDotBg: '#bbf7d0',
+    delayOffDotBg: '#9ca3af',
+    delayOnTextColor: '#022c22',
+    delayOffTextColor: '#111827',
+
+    controlOnShadow: '0 0 14px rgba(236,72,153,0.75)',
+    controlOffShadow: 'none',
+  },
+  desertLead: {
+    frontImg: leadFrontImg,
+    panelImg: leadPanelImg,
+    grillBg: '#000000ff',
+
+    knobLabelColor: '#f9fafb',
+    knobValueColor: '#e5e7eb',
+    knobFaceGradient:
+      'radial-gradient(circle at 30% 20%, #f9fafb 0, #e5e7eb 35%, #4b5563 100%)',
+
+    modeActiveBg: 'linear-gradient(90deg,#f97316,#ea580c)',
+    modeActiveBorder: '1px solid #f97316',
+    modeActiveColor: '#f9fafb',
+    modeInactiveBg: '#111827',
+    modeInactiveColor: '#e5e7eb',
+
+    presetPanelBg: 'rgba(15,23,42,0.95)',
+    presetLabelColor: '#f97316',
+    presetNameColor: '#f9fafb',
+    presetDescColor: '#e5e7eb',
+
+    presetChipActiveBg: 'linear-gradient(90deg,#f97316,#ea580c)',
+    presetChipActiveBorder: '1px solid #f97316',
+    presetChipActiveColor: '#020617',
+    presetChipInactiveBg: '#020617',
+    presetChipInactiveBorder: '1px solid #4b5563',
+    presetChipInactiveColor: '#e5e7eb',
+
+    nbBadgeBg: 'rgba(15,23,42,0.9)',
+    nbBadgeBorder: '1px solid #f97316',
+    nbBadgeTextColor: '#f9fafb',
+    nbBadgeDotBg: '#f97316',
+
+    monitorOnBg: '#334155',
+    monitorOffBg: '#020617',
+    monitorTextColor: '#e5e7eb',
+
+    driveOnBg: '#f97316',
+    driveOffBg: '#1f2937',
+    driveTextColor: '#f9fafb',
+
+    // delay naranja en el lead
+    delayOnBg: 'linear-gradient(90deg,#f97316,#ea580c)',
+    delayOffBg: '#020617',
+    delayOnBorder: '1px solid #f97316',
+    delayOffBorder: '1px solid #4b5563',
+    delayOnDotBg: '#fed7aa',
+    delayOffDotBg: '#9ca3af',
+    delayOnTextColor: '#020617',
+    delayOffTextColor: '#e5e7eb',
+
+    controlOnShadow: '0 0 14px rgba(249,115,22,0.85)',
+    controlOffShadow: 'none',
+  },
+  infernalRaga: {
+    frontImg: infernalFrontImg,
+    panelImg: infernalPanelImg,
+    grillBg: '#000000ff',
+
+    knobLabelColor: '#fb37ff',
+    knobValueColor: '#f9a8ff',
+    knobFaceGradient:
+      'radial-gradient(circle at 30% 20%, #fdf2ff 0, #f9a8ff 35%, #5b21b6 100%)',
+
+    modeActiveBg: 'linear-gradient(90deg,#ec4899,#a855f7)',
+    modeActiveBorder: '1px solid #ec4899',
+    modeActiveColor: '#f9fafb',
+    modeInactiveBg: '#3f0758',
+    modeInactiveColor: '#f9a8ff',
+
+    presetPanelBg: 'rgba(24,6,41,0.95)',
+    presetLabelColor: '#f472b6',
+    presetNameColor: '#f9a8ff',
+    presetDescColor: '#e5e7eb',
+
+    presetChipActiveBg: 'linear-gradient(90deg,#ec4899,#a855f7)',
+    presetChipActiveBorder: '1px solid #ec4899',
+    presetChipActiveColor: '#050816',
+    presetChipInactiveBg: '#020617',
+    presetChipInactiveBorder: '1px solid #4b5563',
+    presetChipInactiveColor: '#e5e7eb',
+
+    nbBadgeBg: 'rgba(24,6,41,0.9)',
+    nbBadgeBorder: '1px solid #ec4899',
+    nbBadgeTextColor: '#f9a8ff',
+    nbBadgeDotBg: '#ec4899',
+
+    monitorOnBg: '#581c87',
+    monitorOffBg: '#020617',
+    monitorTextColor: '#f9fafb',
+
+    driveOnBg: '#ec4899',
+    driveOffBg: '#1f2937',
+    driveTextColor: '#f9fafb',
+
+    // delay magenta/violáceo en el infernal
+    delayOnBg: 'linear-gradient(90deg,#ec4899,#a855f7)',
+    delayOffBg: '#020617',
+    delayOnBorder: '1px solid #ec4899',
+    delayOffBorder: '1px solid #4b5563',
+    delayOnDotBg: '#f9a8ff',
+    delayOffDotBg: '#9ca3af',
+    delayOnTextColor: '#050816',
+    delayOffTextColor: '#e5e7eb',
+
+    controlOnShadow: '0 0 14px rgba(236,72,153,0.95)',
+    controlOffShadow: 'none',
+  },
+};
+
 const AmpPanel: React.FC = () => {
   const {
     // Amp
@@ -236,10 +488,12 @@ const AmpPanel: React.FC = () => {
   const [selectedPreset, setSelectedPreset] = useState<PresetId | 'custom'>(
     'cleanMystic',
   );
+  const [skinPreset, setSkinPreset] = useState<PresetId>('cleanMystic');
 
   const applyPreset = (id: PresetId) => {
     const { settings } = PRESETS[id];
     setSelectedPreset(id);
+    setSkinPreset(id);
 
     setAmpGain(settings.ampGain);
     setAmpTone(settings.ampTone);
@@ -265,9 +519,7 @@ const AmpPanel: React.FC = () => {
   };
 
   const selectedPresetLabel =
-    selectedPreset === 'custom'
-      ? 'Custom'
-      : PRESETS[selectedPreset].label;
+    selectedPreset === 'custom' ? 'Custom' : PRESETS[selectedPreset].label;
   const selectedPresetDescription =
     selectedPreset === 'custom'
       ? 'Ajuste manual del usuario.'
@@ -279,6 +531,10 @@ const AmpPanel: React.FC = () => {
     minor: 'MINOR',
     exotic: 'EXOTIC',
   };
+
+  const skin = SKINS[skinPreset];
+
+  const markCustom = () => setSelectedPreset('custom');
 
   return (
     <section
@@ -411,7 +667,7 @@ const AmpPanel: React.FC = () => {
             {/* Rejilla / grill */}
             <div
               style={{
-               backgroundColor: '#f2d8d4',
+                backgroundColor: skin.grillBg,
                 display: 'flex',
                 height: '638px',
                 alignItems: 'stretch',
@@ -422,7 +678,7 @@ const AmpPanel: React.FC = () => {
               <div
                 style={{
                   flex: 1,
-                  backgroundImage: `url(${neonImg})`,
+                  backgroundImage: `url(${skin.frontImg})`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                   backgroundRepeat: 'no-repeat',
@@ -433,7 +689,7 @@ const AmpPanel: React.FC = () => {
             {/* Panel de controles */}
             <div
               style={{
-                backgroundImage: `url(${input})`,
+                backgroundImage: `url(${skin.panelImg})`,
                 backgroundSize: 'cover',
                 backgroundRepeat: 'no-repeat',
                 padding: '0.75rem 1.1rem 0.8rem',
@@ -450,16 +706,31 @@ const AmpPanel: React.FC = () => {
                   alignItems: 'flex-start',
                   marginBottom: '0.3rem',
                   gap: '0.75rem',
-                  maxHeight:'50px'
+                  maxHeight: '50px',
                 }}
               >
-                <div style={{ maxWidth: 381, position:'relative', top:'-96px', backgroundColor:'#edd9cdb8', padding:'9px' }}>
-                  <div style={{ ...labelStyle, color: '#ff07c9ff' }}>Preset</div>
+                <div
+                  style={{
+                    maxWidth: 381,
+                    position: 'relative',
+                    top: '-96px',
+                    backgroundColor: skin.presetPanelBg,
+                    padding: '9px',
+                  }}
+                >
+                  <div
+                    style={{
+                      ...labelBase,
+                      color: skin.presetLabelColor,
+                    }}
+                  >
+                    Preset
+                  </div>
                   <div
                     style={{
                       fontSize: '0.9rem',
                       fontWeight: 600,
-                      color: '#f700ffff',
+                      color: skin.presetNameColor,
                     }}
                   >
                     {selectedPresetLabel}
@@ -467,7 +738,7 @@ const AmpPanel: React.FC = () => {
                   <div
                     style={{
                       fontSize: '0.75rem',
-                      color: '#131313ff',
+                      color: skin.presetDescColor,
                       marginBottom: '0.25rem',
                     }}
                   >
@@ -498,12 +769,14 @@ const AmpPanel: React.FC = () => {
                             textTransform: 'uppercase',
                             letterSpacing: '0.12em',
                             border: active
-                              ? '1px solid #fb37ff'
-                              : '1px solid #9ca3af',
+                              ? skin.presetChipActiveBorder
+                              : skin.presetChipInactiveBorder,
                             background: active
-                              ? 'linear-gradient(90deg,#fb37ff,#6366f1)'
-                              : '#111827aa',
-                            color: active ? '#f9fafb' : '#e5e7eb',
+                              ? skin.presetChipActiveBg
+                              : skin.presetChipInactiveBg,
+                            color: active
+                              ? skin.presetChipActiveColor
+                              : skin.presetChipInactiveColor,
                             cursor: 'pointer',
                           }}
                         >
@@ -514,21 +787,23 @@ const AmpPanel: React.FC = () => {
                   </div>
                 </div>
 
+                {/* NB • SITAR badge */}
                 <div
                   style={{
                     alignSelf: 'flex-end',
                     padding: '0.1rem 0.5rem',
                     borderRadius: '999px',
-                    border: '1px solid #ff02c8ff',
+                    border: skin.nbBadgeBorder,
                     fontSize: '0.65rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.18em',
-                    color: '#ffffffff',
+                    color: skin.nbBadgeTextColor,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.3rem',
                     position: 'relative',
                     top: '-15px',
+                    background: skin.nbBadgeBg,
                   }}
                 >
                   <span
@@ -536,7 +811,7 @@ const AmpPanel: React.FC = () => {
                       width: 8,
                       height: 8,
                       borderRadius: '999px',
-                      background: '#3660b9ff',
+                      background: skin.nbBadgeDotBg,
                     }}
                   />
                   NB • SITAR
@@ -548,14 +823,19 @@ const AmpPanel: React.FC = () => {
                   onClick={() => setMonitorEnabled(!monitorEnabled)}
                   style={{
                     padding: '8px 14px',
-                    background: monitorEnabled ? '#fe98d1' : '#c4c4c4ff',
-                    color: 'white',
+                    background: monitorEnabled
+                      ? skin.monitorOnBg
+                      : skin.monitorOffBg,
+                    color: skin.monitorTextColor,
                     borderRadius: 999,
                     border: 'none',
                     cursor: 'pointer',
                     fontSize: '0.7rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.12em',
+                    boxShadow: monitorEnabled
+                      ? skin.controlOnShadow
+                      : skin.controlOffShadow,
                   }}
                 >
                   {monitorEnabled ? 'Monitor ON' : 'Monitor OFF'}
@@ -564,20 +844,25 @@ const AmpPanel: React.FC = () => {
                 {/* Drive ON/OFF */}
                 <button
                   type="button"
-                  onClick={() => setDriveEnabled(!driveEnabled)}
+                  onClick={() => {
+                    setDriveEnabled(!driveEnabled);
+                    markCustom();
+                  }}
                   style={{
-                    padding: '0.35rem 1.4rem',
+                    padding: '0.55rem 1.4rem',
                     borderRadius: '999px',
                     border: 'none',
                     fontSize: '0.7rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.16em',
-                    background: driveEnabled ? '#fe98d1' : '#d3d3d3ff',
-                    color: '#f9fafb',
+                    background: driveEnabled
+                      ? skin.driveOnBg
+                      : skin.driveOffBg,
+                    color: skin.driveTextColor,
                     cursor: 'pointer',
                     boxShadow: driveEnabled
-                      ? '0 0 10px rgba(15,23,42,0.8)'
-                      : 'none',
+                      ? skin.controlOnShadow
+                      : skin.controlOffShadow,
                   }}
                 >
                   {driveEnabled ? 'Drive On' : 'Drive Off'}
@@ -586,17 +871,22 @@ const AmpPanel: React.FC = () => {
                 {/* Delay footswitch */}
                 <button
                   type="button"
-                  onClick={() => setDelayEnabled(!delayEnabled)}
+                  onClick={() => {
+                    setDelayEnabled(!delayEnabled);
+                    markCustom();
+                  }}
                   style={{
                     padding: '0.45rem 1.4rem',
                     borderRadius: '999px',
                     border: delayEnabled
-                      ? '1px solid #16a34a'
-                      : '1px solid #9ca3af',
+                      ? skin.delayOnBorder
+                      : skin.delayOffBorder,
                     background: delayEnabled
-                      ? 'radial-gradient(circle at 30% 0,#4ade80 0,#16a34a 50%,#166534 100%)'
-                      : 'transparent',
-                    color: delayEnabled ? '#022c22' : '#111827',
+                      ? skin.delayOnBg
+                      : skin.delayOffBg,
+                    color: delayEnabled
+                      ? skin.delayOnTextColor
+                      : skin.delayOffTextColor,
                     fontSize: '0.7rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.16em',
@@ -605,8 +895,8 @@ const AmpPanel: React.FC = () => {
                     gap: '0.45rem',
                     cursor: 'pointer',
                     boxShadow: delayEnabled
-                      ? '0 0 18px rgba(34,197,94,0.7)'
-                      : 'none',
+                      ? skin.controlOnShadow
+                      : skin.controlOffShadow,
                   }}
                 >
                   <span
@@ -614,7 +904,9 @@ const AmpPanel: React.FC = () => {
                       width: 10,
                       height: 10,
                       borderRadius: '999px',
-                      background: delayEnabled ? '#bbf7d0' : '#9ca3af',
+                      background: delayEnabled
+                        ? skin.delayOnDotBg
+                        : skin.delayOffDotBg,
                     }}
                   />
                   {delayEnabled ? 'Delay On' : 'Delay Off'}
@@ -636,7 +928,10 @@ const AmpPanel: React.FC = () => {
                     <button
                       key={mode}
                       type="button"
-                      onClick={() => setSitarMode(mode)}
+                      onClick={() => {
+                        setSitarMode(mode);
+                        markCustom();
+                      }}
                       style={{
                         padding: '0.25rem 0.75rem',
                         fontSize: '0.65rem',
@@ -644,12 +939,14 @@ const AmpPanel: React.FC = () => {
                         letterSpacing: '0.12em',
                         borderRadius: 999,
                         border: active
-                          ? '1px solid #1d4ed8'
-                          : '1px solid #d4d4d8',
+                          ? skin.modeActiveBorder
+                          : '1px solid transparent',
                         background: active
-                          ? 'linear-gradient(90deg,#60a5fa,#2563eb)'
-                          : '#f4f4f5',
-                        color: active ? '#f9fafb' : '#111827',
+                          ? skin.modeActiveBg
+                          : skin.modeInactiveBg,
+                        color: active
+                          ? skin.modeActiveColor
+                          : skin.modeInactiveColor,
                         cursor: 'pointer',
                       }}
                     >
@@ -677,9 +974,12 @@ const AmpPanel: React.FC = () => {
                   value={ampGain * 100}
                   onChange={(v) => {
                     setAmpGain(v / 100);
-                    setSelectedPreset('custom');
+                    markCustom();
                   }}
                   display={ampGain.toFixed(2)}
+                  labelColor={skin.knobLabelColor}
+                  valueColor={skin.knobValueColor}
+                  faceGradient={skin.knobFaceGradient}
                 />
 
                 <Knob
@@ -689,9 +989,12 @@ const AmpPanel: React.FC = () => {
                   value={bassAmount * 100}
                   onChange={(v) => {
                     setBassAmount(v / 100);
-                    setSelectedPreset('custom');
+                    markCustom();
                   }}
                   display={`${Math.round(bassAmount * 10)}/10`}
+                  labelColor={skin.knobLabelColor}
+                  valueColor={skin.knobValueColor}
+                  faceGradient={skin.knobFaceGradient}
                 />
 
                 <Knob
@@ -701,9 +1004,12 @@ const AmpPanel: React.FC = () => {
                   value={midAmount * 100}
                   onChange={(v) => {
                     setMidAmount(v / 100);
-                    setSelectedPreset('custom');
+                    markCustom();
                   }}
                   display={`${Math.round(midAmount * 10)}/10`}
+                  labelColor={skin.knobLabelColor}
+                  valueColor={skin.knobValueColor}
+                  faceGradient={skin.knobFaceGradient}
                 />
 
                 <Knob
@@ -713,9 +1019,12 @@ const AmpPanel: React.FC = () => {
                   value={trebleAmount * 100}
                   onChange={(v) => {
                     setTrebleAmount(v / 100);
-                    setSelectedPreset('custom');
+                    markCustom();
                   }}
                   display={`${Math.round(trebleAmount * 10)}/10`}
+                  labelColor={skin.knobLabelColor}
+                  valueColor={skin.knobValueColor}
+                  faceGradient={skin.knobFaceGradient}
                 />
 
                 {/* Fila 2: Presence / Tone / Sitar / Master / Drive / Reverb */}
@@ -726,9 +1035,12 @@ const AmpPanel: React.FC = () => {
                   value={presenceAmount * 100}
                   onChange={(v) => {
                     setPresenceAmount(v / 100);
-                    setSelectedPreset('custom');
+                    markCustom();
                   }}
                   display={`${Math.round(presenceAmount * 10)}/10`}
+                  labelColor={skin.knobLabelColor}
+                  valueColor={skin.knobValueColor}
+                  faceGradient={skin.knobFaceGradient}
                 />
 
                 <Knob
@@ -738,9 +1050,12 @@ const AmpPanel: React.FC = () => {
                   value={ampTone * 100}
                   onChange={(v) => {
                     setAmpTone(v / 100);
-                    setSelectedPreset('custom');
+                    markCustom();
                   }}
                   display={`${Math.round(ampTone * 10)}/10`}
+                  labelColor={skin.knobLabelColor}
+                  valueColor={skin.knobValueColor}
+                  faceGradient={skin.knobFaceGradient}
                 />
 
                 <Knob
@@ -750,9 +1065,12 @@ const AmpPanel: React.FC = () => {
                   value={sitarAmount * 100}
                   onChange={(v) => {
                     setSitarAmount(v / 100);
-                    setSelectedPreset('custom');
+                    markCustom();
                   }}
                   display={`${Math.round(sitarAmount * 100)}%`}
+                  labelColor={skin.knobLabelColor}
+                  valueColor={skin.knobValueColor}
+                  faceGradient={skin.knobFaceGradient}
                 />
 
                 <Knob
@@ -762,9 +1080,12 @@ const AmpPanel: React.FC = () => {
                   value={ampMaster * 100}
                   onChange={(v) => {
                     setAmpMaster(v / 100);
-                    setSelectedPreset('custom');
+                    markCustom();
                   }}
                   display={ampMaster.toFixed(2)}
+                  labelColor={skin.knobLabelColor}
+                  valueColor={skin.knobValueColor}
+                  faceGradient={skin.knobFaceGradient}
                 />
 
                 <Knob
@@ -774,9 +1095,12 @@ const AmpPanel: React.FC = () => {
                   value={driveAmount * 100}
                   onChange={(v) => {
                     setDriveAmount(v / 100);
-                    setSelectedPreset('custom');
+                    markCustom();
                   }}
                   display={`${Math.round(driveAmount * 100)}%`}
+                  labelColor={skin.knobLabelColor}
+                  valueColor={skin.knobValueColor}
+                  faceGradient={skin.knobFaceGradient}
                 />
 
                 <Knob
@@ -786,9 +1110,12 @@ const AmpPanel: React.FC = () => {
                   value={reverbAmount * 100}
                   onChange={(v) => {
                     setReverbAmount(v / 100);
-                    setSelectedPreset('custom');
+                    markCustom();
                   }}
                   display={`${Math.round(reverbAmount * 100)}%`}
+                  labelColor={skin.knobLabelColor}
+                  valueColor={skin.knobValueColor}
+                  faceGradient={skin.knobFaceGradient}
                 />
               </div>
             </div>
