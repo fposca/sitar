@@ -17,6 +17,9 @@ export type AudioEngineContextValue = {
   metronomeVolume: number;
   setMetronomeVolume: (v: number) => void;
 
+masterVolume: number;
+setMasterVolume: (v: number) => void;
+
   backingVolume: number;
   setBackingVolume: (v: number) => void;
 

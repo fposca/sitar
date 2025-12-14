@@ -58,6 +58,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // Delay bypass
   const [delayEnabled, setDelayEnabled] = useState(true);
 
+  // volumen master
+  const [masterVolume, setMasterVolume] = useState(1.0);
+
   // Efecto sitar
   const [sitarAmount, setSitarAmount] = useState(0.0); // 0 = apagado
   const [sitarMode, setSitarMode] = useState<SitarMode>('exotic');
@@ -80,7 +83,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const guitarStreamRef = useRef<MediaStream | null>(null);
   const guitarSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const backingSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(
+    null,
+  );
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
 
@@ -93,6 +98,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const ampGainNodeRef = useRef<GainNode | null>(null);
   const toneFilterRef = useRef<BiquadFilterNode | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
+
+  // Gain final para controlar todo el output
+  const finalMasterGainRef = useRef<GainNode | null>(null);
 
   const preDelayGainRef = useRef<GainNode | null>(null);
   const dryGainRef = useRef<GainNode | null>(null);
@@ -409,8 +417,16 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     const monitorGain = ctx.createGain();
     monitorGain.gain.value = monitorEnabled ? 1 : 0;
     monitorGainRef.current = monitorGain;
+
+    // === MASTER GLOBAL ===
+    const finalMasterGain = ctx.createGain();
+    finalMasterGain.gain.value = masterVolume;
+    finalMasterGainRef.current = finalMasterGain;
+
+    // Monitor -> Master -> Destination
     postFxGain.connect(monitorGain);
-    monitorGain.connect(ctx.destination);
+    monitorGain.connect(finalMasterGain);
+    finalMasterGain.connect(ctx.destination);
 
     // Bus de grabación (post-FX)
     const recordGain = ctx.createGain();
@@ -441,6 +457,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     midAmount,
     trebleAmount,
     presenceAmount,
+    masterVolume,
   ]);
 
   // Entrada de guitarra
@@ -631,8 +648,8 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       backingSourceRef.current = backingSource;
 
       const backingGain = ctx.createGain();
-      backingGain.gain.value = backingVolume;     // 👈 usamos el estado
-      backingGainRef.current = backingGain;       // 👈 lo guardamos para live update
+      backingGain.gain.value = backingVolume; // usamos el estado
+      backingGainRef.current = backingGain; // lo guardamos para live update
 
       backingSource.connect(backingGain);
       backingGain.connect(ctx.destination);
@@ -914,18 +931,29 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     }
   }, [reverbAmount, audioContext]);
 
-// Volumen del backing en vivo
-useEffect(() => {
-  if (!audioContext) return;
-  if (backingGainRef.current) {
-    backingGainRef.current.gain.setTargetAtTime(
-      backingVolume,
-      audioContext.currentTime,
-      0.01,
-    );
-  }
-}, [backingVolume, audioContext]);
+  // Volumen del backing en vivo
+  useEffect(() => {
+    if (!audioContext) return;
+    if (backingGainRef.current) {
+      backingGainRef.current.gain.setTargetAtTime(
+        backingVolume,
+        audioContext.currentTime,
+        0.01,
+      );
+    }
+  }, [backingVolume, audioContext]);
 
+  // 🔹 Master output en vivo
+  useEffect(() => {
+    if (!audioContext) return;
+    if (finalMasterGainRef.current) {
+      finalMasterGainRef.current.gain.setTargetAtTime(
+        masterVolume,
+        audioContext.currentTime,
+        0.01,
+      );
+    }
+  }, [masterVolume, audioContext]);
 
   // Cambios de modo del sitar (en vivo)
   useEffect(() => {
@@ -962,7 +990,7 @@ useEffect(() => {
     metronomeVolume,
     setMetronomeVolume,
 
-     // 🔹 Volumen del backing
+    // 🔹 Volumen del backing
     backingVolume,
     setBackingVolume,
 
@@ -1017,6 +1045,9 @@ useEffect(() => {
     startPlaybackAndRecording,
     stopRecording,
     recordingSeconds,
+
+    masterVolume,
+    setMasterVolume,
   };
 
   return (

@@ -6,7 +6,7 @@ const BackingTrackPanel: React.FC = () => {
   const { loadBackingFile, hasBacking, backingWaveform, backingName, playbackProgress, backingVolume, setBackingVolume } =
     useAudioEngine();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
+const { masterVolume, setMasterVolume } = useAudioEngine();
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -83,6 +83,7 @@ const BackingTrackPanel: React.FC = () => {
         background: '#0b1020',
       }}
     >
+    
       <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>1. Backing track</h2>
 
       <input type="file" accept="audio/*" onChange={handleChange} />
@@ -113,6 +114,21 @@ const BackingTrackPanel: React.FC = () => {
               }}
             />
           </div>
+             <div style={{ marginTop: "1rem" }}>
+      <label style={{ display: "block", fontSize: "0.9rem" }}>
+        Volumen master: {(masterVolume * 100).toFixed(0)}%
+      </label>
+
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={masterVolume}
+        onChange={(e) => setMasterVolume(Number(e.target.value))}
+        style={{ width: "100%" }}
+      />
+    </div>
            <label style={{ display: 'block', marginTop: '0.75rem', fontSize: '0.9rem' }}>
         Volumen backing: {(backingVolume * 100).toFixed(0)}%
         <input
