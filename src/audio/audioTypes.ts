@@ -17,6 +17,9 @@ export type AudioEngineContextValue = {
   metronomeVolume: number;
   setMetronomeVolume: (v: number) => void;
 
+  backingVolume: number;
+  setBackingVolume: (v: number) => void;
+
   backingName: string | null;
   backingWaveform: number[] | null;
   playbackProgress: number; // 0..1

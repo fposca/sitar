@@ -69,6 +69,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // Reverb
   const [reverbAmount, setReverbAmount] = useState(0.4);
 
+  // 🔹 Volumen del backing track (0–1)
+  const [backingVolume, setBackingVolume] = useState(0.7);
+
   // Tiempo de grabación
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingStartTimeRef = useRef<number | null>(null);
@@ -120,6 +123,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // Monitor + grabación
   const monitorGainRef = useRef<GainNode | null>(null);
   const recordGainRef = useRef<GainNode | null>(null);
+
+  // 🔹 Gain node del backing para poder ajustarlo en vivo
+  const backingGainRef = useRef<GainNode | null>(null);
 
   const getOrCreateAudioContext = useCallback(() => {
     if (audioContext) return audioContext;
@@ -625,7 +631,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       backingSourceRef.current = backingSource;
 
       const backingGain = ctx.createGain();
-      backingGain.gain.value = 1.0;
+      backingGain.gain.value = backingVolume;     // 👈 usamos el estado
+      backingGainRef.current = backingGain;       // 👈 lo guardamos para live update
+
       backingSource.connect(backingGain);
       backingGain.connect(ctx.destination);
     } else {
@@ -906,6 +914,19 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     }
   }, [reverbAmount, audioContext]);
 
+// Volumen del backing en vivo
+useEffect(() => {
+  if (!audioContext) return;
+  if (backingGainRef.current) {
+    backingGainRef.current.gain.setTargetAtTime(
+      backingVolume,
+      audioContext.currentTime,
+      0.01,
+    );
+  }
+}, [backingVolume, audioContext]);
+
+
   // Cambios de modo del sitar (en vivo)
   useEffect(() => {
     if (!audioContext) return;
@@ -940,6 +961,10 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     stopMetronome,
     metronomeVolume,
     setMetronomeVolume,
+
+     // 🔹 Volumen del backing
+    backingVolume,
+    setBackingVolume,
 
     backingName,
     backingWaveform,

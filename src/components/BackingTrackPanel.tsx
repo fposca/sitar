@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { useAudioEngine } from '../audio/AudioEngineProvider';
 
+
 const BackingTrackPanel: React.FC = () => {
-  const { loadBackingFile, hasBacking, backingWaveform, backingName, playbackProgress } =
+  const { loadBackingFile, hasBacking, backingWaveform, backingName, playbackProgress, backingVolume, setBackingVolume } =
     useAudioEngine();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -112,8 +113,21 @@ const BackingTrackPanel: React.FC = () => {
               }}
             />
           </div>
+           <label style={{ display: 'block', marginTop: '0.75rem', fontSize: '0.9rem' }}>
+        Volumen backing: {(backingVolume * 100).toFixed(0)}%
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={backingVolume}
+          onChange={(e) => setBackingVolume(Number(e.target.value))}
+          style={{ width: '100%' }}
+        />
+      </label>
         </>
       )}
+      
     </section>
   );
 };
