@@ -1,5 +1,5 @@
 // src/components/AmpPanel.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { useAudioEngine, type SitarMode } from '../audio/AudioEngineProvider';
 import neonImg from '../assets/nea.png';
 import input from '../assets/input.png';
@@ -14,7 +14,7 @@ const labelStyle: React.CSSProperties = {
 const valueStyle: React.CSSProperties = {
   fontSize: '0.7rem',
   opacity: 0.75,
-  color: '#161616ff',
+  color: '#ffffffff',
 };
 
 type KnobProps = {
@@ -39,7 +39,7 @@ const Knob: React.FC<KnobProps> = ({ label, min, max, value, onChange, display }
         gap: '0.35rem',
       }}
     >
-      <span style={{ ...labelStyle, color: '#000000ff' }}>{label}</span>
+      <span style={{ ...labelStyle, color: '#ffffffff' }}>{label}</span>
 
       {/* knob visual */}
       <div
@@ -89,26 +89,136 @@ const Knob: React.FC<KnobProps> = ({ label, min, max, value, onChange, display }
   );
 };
 
+/* ---------- PRESETS ---------- */
+
+type PresetId = 'cleanMystic' | 'desertLead' | 'infernalRaga';
+
+type PresetSettings = {
+  ampGain: number;
+  ampTone: number;
+  ampMaster: number;
+  bassAmount: number;
+  midAmount: number;
+  trebleAmount: number;
+  presenceAmount: number;
+  driveAmount: number;
+  driveEnabled: boolean;
+  delayEnabled: boolean;
+  delayTimeMs: number;
+  feedbackAmount: number;
+  mixAmount: number;
+  reverbAmount: number;
+  sitarAmount: number;
+  sitarMode: SitarMode;
+};
+
+const PRESETS: Record<
+  PresetId,
+  {
+    label: string;
+    description: string;
+    settings: PresetSettings;
+  }
+> = {
+  cleanMystic: {
+    label: 'Clean Mystic',
+    description: 'Clean brillante, sitar suave, espacio amplio.',
+    settings: {
+      ampGain: 0.9,
+      ampTone: 0.55,
+      ampMaster: 1.0,
+      bassAmount: 0.55,
+      midAmount: 0.45,
+      trebleAmount: 0.6,
+      presenceAmount: 0.55,
+      driveAmount: 0.18,
+      driveEnabled: false,
+      delayEnabled: true,
+      delayTimeMs: 380,
+      feedbackAmount: 0.28,
+      mixAmount: 0.32,
+      reverbAmount: 0.5,
+      sitarAmount: 0.35,
+      sitarMode: 'major',
+    },
+  },
+  desertLead: {
+    label: 'Desert Lead',
+    description: 'Lead vocal, medios adelante, delay cantado.',
+    settings: {
+      ampGain: 1.25,
+      ampTone: 0.62,
+      ampMaster: 1.2,
+      bassAmount: 0.5,
+      midAmount: 0.65,
+      trebleAmount: 0.6,
+      presenceAmount: 0.65,
+      driveAmount: 0.58,
+      driveEnabled: true,
+      delayEnabled: true,
+      delayTimeMs: 460,
+      feedbackAmount: 0.38,
+      mixAmount: 0.42,
+      reverbAmount: 0.4,
+      sitarAmount: 0.25,
+      sitarMode: 'sharp',
+    },
+  },
+  infernalRaga: {
+    label: 'Infernal Raga',
+    description: 'Modo exotic al palo, mucha presencia y cola.',
+    settings: {
+      ampGain: 1.5,
+      ampTone: 0.7,
+      ampMaster: 1.3,
+      bassAmount: 0.48,
+      midAmount: 0.6,
+      trebleAmount: 0.75,
+      presenceAmount: 0.8,
+      driveAmount: 0.8,
+      driveEnabled: true,
+      delayEnabled: true,
+      delayTimeMs: 520,
+      feedbackAmount: 0.45,
+      mixAmount: 0.55,
+      reverbAmount: 0.6,
+      sitarAmount: 0.6,
+      sitarMode: 'exotic',
+    },
+  },
+};
+
 const AmpPanel: React.FC = () => {
   const {
+    // Amp
     ampGain,
     setAmpGain,
     ampTone,
     setAmpTone,
     ampMaster,
     setAmpMaster,
+    // Delay
     delayEnabled,
     setDelayEnabled,
+    delayTimeMs,
+    setDelayTimeMs,
+    feedbackAmount,
+    setFeedbackAmount,
+    mixAmount,
+    setMixAmount,
+    // Sitar
     sitarAmount,
     setSitarAmount,
+    sitarMode,
+    setSitarMode,
+    // Drive
     driveAmount,
     setDriveAmount,
     driveEnabled,
     setDriveEnabled,
+    // Reverb
     reverbAmount,
     setReverbAmount,
-    sitarMode,
-    setSitarMode,
     // Monitor
     monitorEnabled,
     setMonitorEnabled,
@@ -122,6 +232,46 @@ const AmpPanel: React.FC = () => {
     presenceAmount,
     setPresenceAmount,
   } = useAudioEngine();
+
+  const [selectedPreset, setSelectedPreset] = useState<PresetId | 'custom'>(
+    'cleanMystic',
+  );
+
+  const applyPreset = (id: PresetId) => {
+    const { settings } = PRESETS[id];
+    setSelectedPreset(id);
+
+    setAmpGain(settings.ampGain);
+    setAmpTone(settings.ampTone);
+    setAmpMaster(settings.ampMaster);
+
+    setBassAmount(settings.bassAmount);
+    setMidAmount(settings.midAmount);
+    setTrebleAmount(settings.trebleAmount);
+    setPresenceAmount(settings.presenceAmount);
+
+    setDriveAmount(settings.driveAmount);
+    setDriveEnabled(settings.driveEnabled);
+
+    setDelayEnabled(settings.delayEnabled);
+    setDelayTimeMs(settings.delayTimeMs);
+    setFeedbackAmount(settings.feedbackAmount);
+    setMixAmount(settings.mixAmount);
+
+    setReverbAmount(settings.reverbAmount);
+
+    setSitarAmount(settings.sitarAmount);
+    setSitarMode(settings.sitarMode);
+  };
+
+  const selectedPresetLabel =
+    selectedPreset === 'custom'
+      ? 'Custom'
+      : PRESETS[selectedPreset].label;
+  const selectedPresetDescription =
+    selectedPreset === 'custom'
+      ? 'Ajuste manual del usuario.'
+      : PRESETS[selectedPreset].description;
 
   const modeLabels: Record<SitarMode, string> = {
     sharp: 'SHARP',
@@ -152,12 +302,11 @@ const AmpPanel: React.FC = () => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '0rem',
-                        maxWidth: '100px',
+          marginBottom: '1rem',
         }}
       >
         <div>
-          {/* <div
+          <div
             style={{
               fontSize: '0.7rem',
               textTransform: 'uppercase',
@@ -166,8 +315,8 @@ const AmpPanel: React.FC = () => {
             }}
           >
             NeonBoy
-          </div> */}
-          {/* <div
+          </div>
+          <div
             style={{
               fontSize: '1rem',
               fontWeight: 700,
@@ -176,7 +325,7 @@ const AmpPanel: React.FC = () => {
             }}
           >
             Sitar Amp
-          </div> */}
+          </div>
         </div>
 
         <div
@@ -184,7 +333,6 @@ const AmpPanel: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '0.6rem',
-
           }}
         >
           <div
@@ -199,7 +347,6 @@ const AmpPanel: React.FC = () => {
               alignItems: 'center',
               gap: '0.4rem',
               background: '#020617',
-              marginBottom: '10px'
             }}
           >
             <span
@@ -227,9 +374,9 @@ const AmpPanel: React.FC = () => {
             maxWidth: '1500px',
             borderRadius: '18px',
             overflow: 'hidden',
-            border: '2px solid #dfcbbf',
+            border: '2px solid #020617',
             background:
-              'linear-gradient(180deg,#dfcbbf 0,#dfcbbf 40%,#020617 100%)',
+              'linear-gradient(180deg,#1f2937 0,#020617 40%,#020617 100%)',
           }}
         >
           {/* Manija superior */}
@@ -264,7 +411,7 @@ const AmpPanel: React.FC = () => {
             {/* Rejilla / grill */}
             <div
               style={{
-                backgroundColor:'#dfcbbf',
+               backgroundColor: '#f2d8d4',
                 display: 'flex',
                 height: '638px',
                 alignItems: 'stretch',
@@ -300,13 +447,14 @@ const AmpPanel: React.FC = () => {
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  alignItems: 'center',
+                  alignItems: 'flex-start',
                   marginBottom: '0.3rem',
                   gap: '0.75rem',
+                  maxHeight:'50px'
                 }}
               >
-                <div>
-                  <div style={{ ...labelStyle, color: '#ff07c9ff' }}>&nbsp;</div>
+                <div style={{ maxWidth: 381, position:'relative', top:'-96px', backgroundColor:'#edd9cdb8', padding:'9px' }}>
+                  <div style={{ ...labelStyle, color: '#ff07c9ff' }}>Preset</div>
                   <div
                     style={{
                       fontSize: '0.9rem',
@@ -314,10 +462,55 @@ const AmpPanel: React.FC = () => {
                       color: '#f700ffff',
                     }}
                   >
-                    &nbsp;
+                    {selectedPresetLabel}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#ffffffff' }}>
-                    &nbsp;
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      color: '#131313ff',
+                      marginBottom: '0.25rem',
+                    }}
+                  >
+                    {selectedPresetDescription}
+                  </div>
+
+                  {/* Botones de preset */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.35rem',
+                      flexWrap: 'wrap',
+                      marginTop: '0.15rem',
+                    }}
+                  >
+                    {(Object.keys(PRESETS) as PresetId[]).map((id) => {
+                      const active = selectedPreset === id;
+                      const p = PRESETS[id];
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => applyPreset(id)}
+                          style={{
+                            padding: '0.18rem 0.6rem',
+                            borderRadius: 999,
+                            fontSize: '0.65rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.12em',
+                            border: active
+                              ? '1px solid #fb37ff'
+                              : '1px solid #9ca3af',
+                            background: active
+                              ? 'linear-gradient(90deg,#fb37ff,#6366f1)'
+                              : '#111827aa',
+                            color: active ? '#f9fafb' : '#e5e7eb',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {p.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -330,7 +523,7 @@ const AmpPanel: React.FC = () => {
                     fontSize: '0.65rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.18em',
-                    color: '#3660b9ff',
+                    color: '#ffffffff',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.3rem',
@@ -355,18 +548,14 @@ const AmpPanel: React.FC = () => {
                   onClick={() => setMonitorEnabled(!monitorEnabled)}
                   style={{
                     padding: '8px 14px',
-                    background: monitorEnabled ? '#fa95c8' : '#a0a0a0ff',
-                    color: 'black',
-        
+                    background: monitorEnabled ? '#fe98d1' : '#c4c4c4ff',
+                    color: 'white',
+                    borderRadius: 999,
                     border: 'none',
                     cursor: 'pointer',
                     fontSize: '0.7rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.12em',
-                    borderRadius: '999px',
-                     boxShadow: driveEnabled
-                      ? '0 0 10px rgba(250, 110, 231, 0.8)'
-                      : 'none',
                   }}
                 >
                   {monitorEnabled ? 'Monitor ON' : 'Monitor OFF'}
@@ -383,11 +572,11 @@ const AmpPanel: React.FC = () => {
                     fontSize: '0.7rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.16em',
-                    background: driveEnabled ? '#fa95c8' : '#959596ff',
+                    background: driveEnabled ? '#fe98d1' : '#d3d3d3ff',
                     color: '#f9fafb',
                     cursor: 'pointer',
                     boxShadow: driveEnabled
-                      ? '0 0 10px rgba(250, 110, 231, 0.8)'
+                      ? '0 0 10px rgba(15,23,42,0.8)'
                       : 'none',
                   }}
                 >
@@ -402,10 +591,10 @@ const AmpPanel: React.FC = () => {
                     padding: '0.45rem 1.4rem',
                     borderRadius: '999px',
                     border: delayEnabled
-                      ? '1px solid #fa95c8'
+                      ? '1px solid #16a34a'
                       : '1px solid #9ca3af',
                     background: delayEnabled
-                      ? '#fa95c8'
+                      ? 'radial-gradient(circle at 30% 0,#4ade80 0,#16a34a 50%,#166534 100%)'
                       : 'transparent',
                     color: delayEnabled ? '#022c22' : '#111827',
                     fontSize: '0.7rem',
@@ -416,7 +605,7 @@ const AmpPanel: React.FC = () => {
                     gap: '0.45rem',
                     cursor: 'pointer',
                     boxShadow: delayEnabled
-                      ? '0 0 18px rgba(245, 5, 137, 0.7)'
+                      ? '0 0 18px rgba(34,197,94,0.7)'
                       : 'none',
                   }}
                 >
@@ -425,7 +614,7 @@ const AmpPanel: React.FC = () => {
                       width: 10,
                       height: 10,
                       borderRadius: '999px',
-                      background: delayEnabled ? '#fd007fff' : '#9ca3af',
+                      background: delayEnabled ? '#bbf7d0' : '#9ca3af',
                     }}
                   />
                   {delayEnabled ? 'Delay On' : 'Delay Off'}
@@ -486,7 +675,10 @@ const AmpPanel: React.FC = () => {
                   min={0}
                   max={200}
                   value={ampGain * 100}
-                  onChange={(v) => setAmpGain(v / 100)}
+                  onChange={(v) => {
+                    setAmpGain(v / 100);
+                    setSelectedPreset('custom');
+                  }}
                   display={ampGain.toFixed(2)}
                 />
 
@@ -495,7 +687,10 @@ const AmpPanel: React.FC = () => {
                   min={0}
                   max={100}
                   value={bassAmount * 100}
-                  onChange={(v) => setBassAmount(v / 100)}
+                  onChange={(v) => {
+                    setBassAmount(v / 100);
+                    setSelectedPreset('custom');
+                  }}
                   display={`${Math.round(bassAmount * 10)}/10`}
                 />
 
@@ -504,7 +699,10 @@ const AmpPanel: React.FC = () => {
                   min={0}
                   max={100}
                   value={midAmount * 100}
-                  onChange={(v) => setMidAmount(v / 100)}
+                  onChange={(v) => {
+                    setMidAmount(v / 100);
+                    setSelectedPreset('custom');
+                  }}
                   display={`${Math.round(midAmount * 10)}/10`}
                 />
 
@@ -513,7 +711,10 @@ const AmpPanel: React.FC = () => {
                   min={0}
                   max={100}
                   value={trebleAmount * 100}
-                  onChange={(v) => setTrebleAmount(v / 100)}
+                  onChange={(v) => {
+                    setTrebleAmount(v / 100);
+                    setSelectedPreset('custom');
+                  }}
                   display={`${Math.round(trebleAmount * 10)}/10`}
                 />
 
@@ -523,7 +724,10 @@ const AmpPanel: React.FC = () => {
                   min={0}
                   max={100}
                   value={presenceAmount * 100}
-                  onChange={(v) => setPresenceAmount(v / 100)}
+                  onChange={(v) => {
+                    setPresenceAmount(v / 100);
+                    setSelectedPreset('custom');
+                  }}
                   display={`${Math.round(presenceAmount * 10)}/10`}
                 />
 
@@ -532,7 +736,10 @@ const AmpPanel: React.FC = () => {
                   min={0}
                   max={100}
                   value={ampTone * 100}
-                  onChange={(v) => setAmpTone(v / 100)}
+                  onChange={(v) => {
+                    setAmpTone(v / 100);
+                    setSelectedPreset('custom');
+                  }}
                   display={`${Math.round(ampTone * 10)}/10`}
                 />
 
@@ -541,7 +748,10 @@ const AmpPanel: React.FC = () => {
                   min={0}
                   max={100}
                   value={sitarAmount * 100}
-                  onChange={(v) => setSitarAmount(v / 100)}
+                  onChange={(v) => {
+                    setSitarAmount(v / 100);
+                    setSelectedPreset('custom');
+                  }}
                   display={`${Math.round(sitarAmount * 100)}%`}
                 />
 
@@ -550,7 +760,10 @@ const AmpPanel: React.FC = () => {
                   min={0}
                   max={200}
                   value={ampMaster * 100}
-                  onChange={(v) => setAmpMaster(v / 100)}
+                  onChange={(v) => {
+                    setAmpMaster(v / 100);
+                    setSelectedPreset('custom');
+                  }}
                   display={ampMaster.toFixed(2)}
                 />
 
@@ -559,7 +772,10 @@ const AmpPanel: React.FC = () => {
                   min={0}
                   max={100}
                   value={driveAmount * 100}
-                  onChange={(v) => setDriveAmount(v / 100)}
+                  onChange={(v) => {
+                    setDriveAmount(v / 100);
+                    setSelectedPreset('custom');
+                  }}
                   display={`${Math.round(driveAmount * 100)}%`}
                 />
 
@@ -568,7 +784,10 @@ const AmpPanel: React.FC = () => {
                   min={0}
                   max={100}
                   value={reverbAmount * 100}
-                  onChange={(v) => setReverbAmount(v / 100)}
+                  onChange={(v) => {
+                    setReverbAmount(v / 100);
+                    setSelectedPreset('custom');
+                  }}
                   display={`${Math.round(reverbAmount * 100)}%`}
                 />
               </div>

@@ -61,7 +61,7 @@ const NeonSitarLayout: React.FC = () => {
           <div
             style={{
               flex: 0,
-              width: '380px',
+              width: '340px',
               display: 'flex',
               flexDirection: 'column',
               gap: '1rem',
