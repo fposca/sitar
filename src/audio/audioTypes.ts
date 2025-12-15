@@ -23,6 +23,7 @@ export type AudioEngineContextValue = {
   stopProcessed: () => void;
   exportProcessed: () => void;
   processedWaveform: number[] | null;
+  offlinePreviewProgress: number; // 0..1
 
    // Volumen del preview offline
   offlineVolume: number;

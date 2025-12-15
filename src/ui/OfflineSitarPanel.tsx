@@ -4,9 +4,13 @@ import { useAudioEngine } from '../audio/AudioEngineProvider';
 
 type WaveformDisplayProps = {
   waveform: number[] | null;
+  progress: number; // 0..1 – progreso del preview
 };
 
-const WaveformDisplay: React.FC<WaveformDisplayProps> = ({ waveform }) => {
+const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
+  waveform,
+  progress,
+}) => {
   if (!waveform || waveform.length === 0) {
     return (
       <div
@@ -47,6 +51,8 @@ const WaveformDisplay: React.FC<WaveformDisplayProps> = ({ waveform }) => {
     return result;
   }, [waveform]);
 
+  const clampedProgress = Math.max(0, Math.min(1, progress));
+
   return (
     <div
       style={{
@@ -60,6 +66,7 @@ const WaveformDisplay: React.FC<WaveformDisplayProps> = ({ waveform }) => {
         marginBottom: '0.75rem',
       }}
     >
+      {/* línea central */}
       <div
         style={{
           position: 'absolute',
@@ -70,6 +77,8 @@ const WaveformDisplay: React.FC<WaveformDisplayProps> = ({ waveform }) => {
           background: '#111827',
         }}
       />
+
+      {/* barras */}
       <div
         style={{
           position: 'relative',
@@ -98,6 +107,20 @@ const WaveformDisplay: React.FC<WaveformDisplayProps> = ({ waveform }) => {
             />
           );
         })}
+
+        {/* cursor de reproducción */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 4,
+            bottom: 4,
+            width: 2,
+            left: `${clampedProgress * 100}%`,
+            background: '#f97316',
+            boxShadow: '0 0 8px rgba(249,115,22,0.9)',
+            pointerEvents: 'none',
+          }}
+        />
       </div>
     </div>
   );
@@ -112,6 +135,7 @@ const OfflineSitarPanel: React.FC = () => {
     processedWaveform,
     offlineVolume,
     setOfflineVolume,
+    offlinePreviewProgress, // 👈 viene del contexto
   } = useAudioEngine();
 
   const [file, setFile] = useState<File | null>(null);
@@ -194,8 +218,11 @@ const OfflineSitarPanel: React.FC = () => {
         {isProcessing ? 'Procesando...' : 'Aplicar Sitar Amp'}
       </button>
 
-      {/* gráfico */}
-      <WaveformDisplay waveform={processedWaveform} />
+      {/* gráfico + cursor */}
+      <WaveformDisplay
+        waveform={processedWaveform}
+        progress={offlinePreviewProgress}
+      />
 
       {/* Volumen de preview */}
       <div

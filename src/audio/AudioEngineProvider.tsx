@@ -121,12 +121,15 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [ampGain, setAmpGain] = useState(1.0); // 1 = unity
   const [ampTone, setAmpTone] = useState(0.5); // 0..1
   const [ampMaster, setAmpMaster] = useState(1.0);
+  
 
   // Tonestack
   const [bassAmount, setBassAmount] = useState(0.5); // 0..1
   const [midAmount, setMidAmount] = useState(0.5); // 0..1
   const [trebleAmount, setTrebleAmount] = useState(0.5); // 0..1
   const [presenceAmount, setPresenceAmount] = useState(0.5); // 0..1
+
+  
 
   // Delay bypass
   const [delayEnabled, setDelayEnabled] = useState(true);
@@ -147,7 +150,12 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
   // 🔹 Volumen del backing track (0–1)
   const [backingVolume, setBackingVolume] = useState(0.7);
+// 🔸 Progreso del preview offline (0..1)
+const [offlinePreviewProgress, setOfflinePreviewProgress] = useState(0);
 
+// Refs para la animación del cursor en el preview offline
+const offlinePreviewStartTimeRef = useRef<number | null>(null);
+const offlinePreviewAnimRef = useRef<number | null>(null);
   // Buffer procesado offline
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
   const [processedWaveform, setProcessedWaveform] = useState<number[] | null>(null);
@@ -159,10 +167,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const recordingStartTimeRef = useRef<number | null>(null);
   const recordingTimerIdRef = useRef<number | null>(null);
  // Fuente para pre-escuchar el audio procesado
-  const offlinePreviewGainRef = useRef<GainNode | null>(null);
   // Fuente para pre-escuchar el audio procesado
   const offlinePreviewSourceRef = useRef<AudioBufferSourceNode | null>(null);
-
+  const offlinePreviewGainRef = useRef<GainNode | null>(null);
   const guitarStreamRef = useRef<MediaStream | null>(null);
   const guitarSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const backingSourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -279,7 +286,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
   // ---------- PLAY / EXPORT DEL PROCESADO OFFLINE ----------
 
-    const playProcessed = useCallback(() => {
+  const playProcessed = useCallback(() => {
     if (!processedBuffer) {
       setStatus('No hay audio procesado todavía.');
       return;
@@ -298,38 +305,73 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       offlinePreviewSourceRef.current = null;
     }
 
-    // crear / actualizar gain de preview
+    // asegurar gain del preview
     if (!offlinePreviewGainRef.current) {
       const g = ctx.createGain();
-      g.gain.value = offlineVolume;
+      g.gain.value = offlineVolume; // usamos el volumen del estado
       g.connect(ctx.destination);
       offlinePreviewGainRef.current = g;
-    } else {
-      offlinePreviewGainRef.current.gain.value = offlineVolume;
     }
 
     const src = ctx.createBufferSource();
     src.buffer = processedBuffer;
-    src.connect(offlinePreviewGainRef.current);
+    src.connect(offlinePreviewGainRef.current!);
     src.start();
 
     offlinePreviewSourceRef.current = src;
+
+    // animación del cursor sobre la waveform
+    const startTime = ctx.currentTime;
+    const duration = processedBuffer.duration;
+
+    const step = () => {
+      if (!offlinePreviewSourceRef.current || offlinePreviewSourceRef.current !== src) {
+        return;
+      }
+      const elapsed = ctx.currentTime - startTime;
+      const progress = Math.min(1, Math.max(0, elapsed / duration));
+      setOfflinePreviewProgress(progress);
+      if (elapsed < duration) {
+        requestAnimationFrame(step);
+      } else {
+        setOfflinePreviewProgress(0);
+      }
+    };
+
+    requestAnimationFrame(step);
+
+    src.onended = () => {
+      if (offlinePreviewSourceRef.current === src) {
+        offlinePreviewSourceRef.current = null;
+        setOfflinePreviewProgress(0);
+      }
+    };
+
     setStatus('Reproduciendo audio procesado...');
   }, [processedBuffer, getOrCreateAudioContext, offlineVolume]);
 
 
-  const stopProcessed = useCallback(() => {
-    if (offlinePreviewSourceRef.current) {
-      try {
-        offlinePreviewSourceRef.current.stop();
-      } catch {
-        // ignore
-      }
-      offlinePreviewSourceRef.current.disconnect();
-      offlinePreviewSourceRef.current = null;
+ const stopProcessed = useCallback(() => {
+  if (offlinePreviewSourceRef.current) {
+    try {
+      offlinePreviewSourceRef.current.stop();
+    } catch {
+      // ignore
     }
-    setStatus('Reproducción detenida.');
-  }, []);
+    offlinePreviewSourceRef.current.disconnect();
+    offlinePreviewSourceRef.current = null;
+  }
+
+  if (offlinePreviewAnimRef.current != null) {
+    cancelAnimationFrame(offlinePreviewAnimRef.current);
+    offlinePreviewAnimRef.current = null;
+  }
+
+  offlinePreviewStartTimeRef.current = null;
+  setOfflinePreviewProgress(0);
+  setStatus('Reproducción detenida.');
+}, []);
+
 
   const exportProcessed = useCallback(() => {
     if (!processedBuffer) {
@@ -1077,6 +1119,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
           // ignore
         }
       }
+      if (offlinePreviewAnimRef.current != null) {
+  cancelAnimationFrame(offlinePreviewAnimRef.current);
+}
       stopProgressAnimation();
       if (recordingTimerIdRef.current != null) {
         clearInterval(recordingTimerIdRef.current);
@@ -1085,6 +1130,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       audioContext?.close();
     };
   }, [audioContext]);
+  
 
   // Volumen del preview offline en vivo
   useEffect(() => {
@@ -1389,6 +1435,10 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     processedWaveform,
     offlineVolume,
     setOfflineVolume,
+    offlinePreviewProgress,
+    
+    
+    
 
 
 
