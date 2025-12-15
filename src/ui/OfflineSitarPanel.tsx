@@ -175,7 +175,7 @@ const OfflineSitarPanel: React.FC = () => {
       }}
     >
       <h2 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>
-        5. Procesar audio (offline)
+        Procesar audio (offline)
       </h2>
 
       <label

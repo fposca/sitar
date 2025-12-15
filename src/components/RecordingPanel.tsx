@@ -40,7 +40,7 @@ const RecordingPanel: React.FC = () => {
         background: '#0b1020',
       }}
     >
-      <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>4. Grabación</h2>
+      <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>Grabación</h2>
 
       {/* Barra de estado REC */}
       <div

@@ -73,6 +73,15 @@ export type AudioEngineContextValue = {
   delayEnabled: boolean;
   setDelayEnabled: (value: boolean) => void;
 
+  ragaEnabled: boolean;
+setRagaEnabled: (value: boolean) => void;
+ragaResonance: number;
+setRagaResonance: (value: number) => void;
+ragaDroneLevel: number;
+setRagaDroneLevel: (value: number) => void;
+ragaColor: number;
+setRagaColor: (value: number) => void;
+
   // Efecto sitar (0 = apagado, 1 = máximo)
   sitarAmount: number;
   setSitarAmount: (value: number) => void;

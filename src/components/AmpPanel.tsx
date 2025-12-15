@@ -13,6 +13,7 @@ import leadPanelImg from '../assets/input-lead.png';
 // INFERNAL (equipo oscuro rosa)
 import infernalFrontImg from '../assets/nea-infernal.png';
 import infernalPanelImg from '../assets/input-infernal.png';
+import pedalImg from '../assets/pedal.png';
 
 const labelBase: React.CSSProperties = {
   fontSize: '0.7rem',
@@ -440,6 +441,8 @@ const SKINS: Record<
   },
 };
 
+type SubPanel = 'amp' | 'pedals';
+
 const AmpPanel: React.FC = () => {
   const {
     // Amp
@@ -489,6 +492,7 @@ const AmpPanel: React.FC = () => {
     'cleanMystic',
   );
   const [skinPreset, setSkinPreset] = useState<PresetId>('cleanMystic');
+  const [subPanel, setSubPanel] = useState<SubPanel>('amp');
 
   const applyPreset = (id: PresetId) => {
     const { settings } = PRESETS[id];
@@ -533,6 +537,15 @@ const AmpPanel: React.FC = () => {
   };
 
   const skin = SKINS[skinPreset];
+
+  // colores dinámicos para tabs y pedales
+  const tabsActiveBg = skin.driveOnBg;
+  const tabsActiveColor = skin.driveTextColor;
+  const tabsInactiveColor = '#e5e7eb';
+
+  // fondo del panel de pedales: clean rosa, el resto negro
+  const pedalsBgColor =
+    skinPreset === 'cleanMystic' ? '#f4d9d5' : '#000000';
 
   const markCustom = () => setSelectedPreset('custom');
 
@@ -582,9 +595,7 @@ const AmpPanel: React.FC = () => {
           >
             Sitar Amp
           </div>
-        </div>
-
-        <div
+             <div
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -599,6 +610,9 @@ const AmpPanel: React.FC = () => {
               fontSize: '0.7rem',
               textTransform: 'uppercase',
               letterSpacing: '0.12em',
+              position:'relative',
+              top:'-23px',
+              left:'147px',
               display: 'flex',
               alignItems: 'center',
               gap: '0.4rem',
@@ -617,6 +631,9 @@ const AmpPanel: React.FC = () => {
             Standby
           </div>
         </div>
+        </div>
+
+     
       </div>
 
       {/* Cabezál + mesa */}
@@ -698,426 +715,559 @@ const AmpPanel: React.FC = () => {
                 gap: '0.7rem',
               }}
             >
-              {/* Preset + logo + switches */}
+              {/* Tabs: Equipo / Pedales */}
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  marginBottom: '0.3rem',
-                  gap: '0.75rem',
-                  maxHeight: '50px',
+                  alignSelf: 'center',
+                  marginBottom: '0.45rem',
+                  padding: '0.12rem',
+                  borderRadius: 999,
+                  background: 'rgba(15,23,42,0.85)',
+                  display: 'inline-flex',
+                  gap: '0.15rem',
                 }}
               >
-                <div
-                  style={{
-                    maxWidth: 381,
-                    position: 'relative',
-                    top: '-96px',
-                    backgroundColor: skin.presetPanelBg,
-                    padding: '9px',
-                  }}
-                >
-                  <div
-                    style={{
-                      ...labelBase,
-                      color: skin.presetLabelColor,
-                    }}
-                  >
-                    Preset
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '0.9rem',
-                      fontWeight: 600,
-                      color: skin.presetNameColor,
-                    }}
-                  >
-                    {selectedPresetLabel}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '0.75rem',
-                      color: skin.presetDescColor,
-                      marginBottom: '0.25rem',
-                    }}
-                  >
-                    {selectedPresetDescription}
-                  </div>
-
-                  {/* Botones de preset */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: '0.35rem',
-                      flexWrap: 'wrap',
-                      marginTop: '0.15rem',
-                    }}
-                  >
-                    {(Object.keys(PRESETS) as PresetId[]).map((id) => {
-                      const active = selectedPreset === id;
-                      const p = PRESETS[id];
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => applyPreset(id)}
-                          style={{
-                            padding: '0.18rem 0.6rem',
-                            borderRadius: 999,
-                            fontSize: '0.65rem',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.12em',
-                            border: active
-                              ? skin.presetChipActiveBorder
-                              : skin.presetChipInactiveBorder,
-                            background: active
-                              ? skin.presetChipActiveBg
-                              : skin.presetChipInactiveBg,
-                            color: active
-                              ? skin.presetChipActiveColor
-                              : skin.presetChipInactiveColor,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {p.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* NB • SITAR badge */}
-                <div
-                  style={{
-                    alignSelf: 'flex-end',
-                    padding: '0.1rem 0.5rem',
-                    borderRadius: '999px',
-                    border: skin.nbBadgeBorder,
-                    fontSize: '0.65rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.18em',
-                    color: skin.nbBadgeTextColor,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    position: 'relative',
-                    top: '-15px',
-                    background: skin.nbBadgeBg,
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '999px',
-                      background: skin.nbBadgeDotBg,
-                    }}
-                  />
-                  NB • SITAR
-                </div>
-
-                {/* Botón de monitor */}
-                <button
-                  type="button"
-                  onClick={() => setMonitorEnabled(!monitorEnabled)}
-                  style={{
-                    padding: '8px 14px',
-                    background: monitorEnabled
-                      ? skin.monitorOnBg
-                      : skin.monitorOffBg,
-                    color: skin.monitorTextColor,
-                    borderRadius: 999,
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.7rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.12em',
-                    boxShadow: monitorEnabled
-                      ? skin.controlOnShadow
-                      : skin.controlOffShadow,
-                  }}
-                >
-                  {monitorEnabled ? 'Monitor ON' : 'Monitor OFF'}
-                </button>
-
-                {/* Drive ON/OFF */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDriveEnabled(!driveEnabled);
-                    markCustom();
-                  }}
-                  style={{
-                    padding: '0.55rem 1.4rem',
-                    borderRadius: '999px',
-                    border: 'none',
-                    fontSize: '0.7rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.16em',
-                    background: driveEnabled
-                      ? skin.driveOnBg
-                      : skin.driveOffBg,
-                    color: skin.driveTextColor,
-                    cursor: 'pointer',
-                    boxShadow: driveEnabled
-                      ? skin.controlOnShadow
-                      : skin.controlOffShadow,
-                  }}
-                >
-                  {driveEnabled ? 'Drive On' : 'Drive Off'}
-                </button>
-
-                {/* Delay footswitch */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDelayEnabled(!delayEnabled);
-                    markCustom();
-                  }}
-                  style={{
-                    padding: '0.45rem 1.4rem',
-                    borderRadius: '999px',
-                    border: delayEnabled
-                      ? skin.delayOnBorder
-                      : skin.delayOffBorder,
-                    background: delayEnabled
-                      ? skin.delayOnBg
-                      : skin.delayOffBg,
-                    color: delayEnabled
-                      ? skin.delayOnTextColor
-                      : skin.delayOffTextColor,
-                    fontSize: '0.7rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.16em',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.45rem',
-                    cursor: 'pointer',
-                    boxShadow: delayEnabled
-                      ? skin.controlOnShadow
-                      : skin.controlOffShadow,
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: '999px',
-                      background: delayEnabled
-                        ? skin.delayOnDotBg
-                        : skin.delayOffDotBg,
-                    }}
-                  />
-                  {delayEnabled ? 'Delay On' : 'Delay Off'}
-                </button>
-              </div>
-
-              {/* Modos de sitar */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '0.4rem',
-                  marginBottom: '0.4rem',
-                  marginLeft: '226px',
-                }}
-              >
-                {(Object.keys(modeLabels) as SitarMode[]).map((mode) => {
-                  const active = sitarMode === mode;
+                {(['amp', 'pedals'] as SubPanel[]).map((tab) => {
+                  const active = subPanel === tab;
+                  const label = tab === 'amp' ? 'EQUIPO' : 'PEDALES';
                   return (
                     <button
-                      key={mode}
+                      key={tab}
                       type="button"
-                      onClick={() => {
-                        setSitarMode(mode);
-                        markCustom();
-                      }}
+                      onClick={() => setSubPanel(tab)}
                       style={{
-                        padding: '0.25rem 0.75rem',
-                        fontSize: '0.65rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.12em',
                         borderRadius: 999,
-                        border: active
-                          ? skin.modeActiveBorder
-                          : '1px solid transparent',
-                        background: active
-                          ? skin.modeActiveBg
-                          : skin.modeInactiveBg,
-                        color: active
-                          ? skin.modeActiveColor
-                          : skin.modeInactiveColor,
+                        border: 'none',
+                        padding: '0.22rem 0.9rem',
+                        fontSize: '0.7rem',
+                        letterSpacing: '0.14em',
+                        textTransform: 'uppercase',
                         cursor: 'pointer',
+                        background: active ? tabsActiveBg : 'transparent',
+                        color: active ? tabsActiveColor : tabsInactiveColor,
+                        opacity: active ? 1 : 0.75,
+                        boxShadow: active ? skin.controlOnShadow : 'none',
                       }}
                     >
-                      {modeLabels[mode]}
+                      {label}
                     </button>
                   );
                 })}
               </div>
 
-              {/* Controles (knobs) */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '1.8rem',
-                  justifyContent: 'flex-start',
-                  flexWrap: 'wrap',
-                  marginLeft: '201px',
-                }}
-              >
-                {/* Fila 1: Gain / Bass / Mid / Treble */}
-                <Knob
-                  label="Gain"
-                  min={0}
-                  max={200}
-                  value={ampGain * 100}
-                  onChange={(v) => {
-                    setAmpGain(v / 100);
-                    markCustom();
-                  }}
-                  display={ampGain.toFixed(2)}
-                  labelColor={skin.knobLabelColor}
-                  valueColor={skin.knobValueColor}
-                  faceGradient={skin.knobFaceGradient}
-                />
+              {/* ---------- PANEL EQUIPO ---------- */}
+              {subPanel === 'amp' && (
+                <>
+                  {/* Preset + logo + switches (Monitor / Drive) */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: '-45px',
+                      gap: '0.75rem',
+                      maxHeight: '50px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxWidth: 381,
+                        position: 'relative',
+                        top: '-144px',
+                        backgroundColor: skin.presetPanelBg,
+                        padding: '9px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          ...labelBase,
+                          color: skin.presetLabelColor,
+                        }}
+                      >
+                        Preset
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '0.9rem',
+                          fontWeight: 600,
+                          color: skin.presetNameColor,
+                        }}
+                      >
+                        {selectedPresetLabel}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '0.75rem',
+                          color: skin.presetDescColor,
+                          marginBottom: '0.25rem',
+                        }}
+                      >
+                        {selectedPresetDescription}
+                      </div>
 
-                <Knob
-                  label="Bass"
-                  min={0}
-                  max={100}
-                  value={bassAmount * 100}
-                  onChange={(v) => {
-                    setBassAmount(v / 100);
-                    markCustom();
-                  }}
-                  display={`${Math.round(bassAmount * 10)}/10`}
-                  labelColor={skin.knobLabelColor}
-                  valueColor={skin.knobValueColor}
-                  faceGradient={skin.knobFaceGradient}
-                />
+                      {/* Botones de preset */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '0.35rem',
+                          flexWrap: 'wrap',
+                          marginTop: '0.15rem',
+                        }}
+                      >
+                        {(Object.keys(PRESETS) as PresetId[]).map((id) => {
+                          const active = selectedPreset === id;
+                          const p = PRESETS[id];
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => applyPreset(id)}
+                              style={{
+                                padding: '0.18rem 0.6rem',
+                                borderRadius: 999,
+                                fontSize: '0.65rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.12em',
+                                border: active
+                                  ? skin.presetChipActiveBorder
+                                  : skin.presetChipInactiveBorder,
+                                background: active
+                                  ? skin.presetChipActiveBg
+                                  : skin.presetChipInactiveBg,
+                                color: active
+                                  ? skin.presetChipActiveColor
+                                  : skin.presetChipInactiveColor,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {p.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
 
-                <Knob
-                  label="Mid"
-                  min={0}
-                  max={100}
-                  value={midAmount * 100}
-                  onChange={(v) => {
-                    setMidAmount(v / 100);
-                    markCustom();
-                  }}
-                  display={`${Math.round(midAmount * 10)}/10`}
-                  labelColor={skin.knobLabelColor}
-                  valueColor={skin.knobValueColor}
-                  faceGradient={skin.knobFaceGradient}
-                />
+                    {/* NB • SITAR badge */}
+                    <div
+                      style={{
+                        alignSelf: 'flex-end',
+                        padding: '0.1rem 0.5rem',
+                        borderRadius: '999px',
+                        border: skin.nbBadgeBorder,
+                        fontSize: '0.65rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.18em',
+                        color: skin.nbBadgeTextColor,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        position: 'relative',
+                        top: '-15px',
+                        background: skin.nbBadgeBg,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '999px',
+                          background: skin.nbBadgeDotBg,
+                        }}
+                      />
+                      NB • SITAR
+                    </div>
 
-                <Knob
-                  label="Treble"
-                  min={0}
-                  max={100}
-                  value={trebleAmount * 100}
-                  onChange={(v) => {
-                    setTrebleAmount(v / 100);
-                    markCustom();
-                  }}
-                  display={`${Math.round(trebleAmount * 10)}/10`}
-                  labelColor={skin.knobLabelColor}
-                  valueColor={skin.knobValueColor}
-                  faceGradient={skin.knobFaceGradient}
-                />
+                    {/* Botón de monitor */}
+                    <button
+                      type="button"
+                      onClick={() => setMonitorEnabled(!monitorEnabled)}
+                      style={{
+                        padding: '8px 14px',
+                        background: monitorEnabled
+                          ? skin.monitorOnBg
+                          : skin.monitorOffBg,
+                        color: skin.monitorTextColor,
+                        borderRadius: 999,
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.7rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.12em',
+                        boxShadow: monitorEnabled
+                          ? skin.controlOnShadow
+                          : skin.controlOffShadow,
+                      }}
+                    >
+                      {monitorEnabled ? 'Monitor ON' : 'Monitor OFF'}
+                    </button>
 
-                {/* Fila 2: Presence / Tone / Sitar / Master / Drive / Reverb */}
-                <Knob
-                  label="Presence"
-                  min={0}
-                  max={100}
-                  value={presenceAmount * 100}
-                  onChange={(v) => {
-                    setPresenceAmount(v / 100);
-                    markCustom();
-                  }}
-                  display={`${Math.round(presenceAmount * 10)}/10`}
-                  labelColor={skin.knobLabelColor}
-                  valueColor={skin.knobValueColor}
-                  faceGradient={skin.knobFaceGradient}
-                />
+                    {/* Drive ON/OFF */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDriveEnabled(!driveEnabled);
+                        markCustom();
+                      }}
+                      style={{
+                        padding: '0.55rem 1.4rem',
+                        borderRadius: '999px',
+                        border: 'none',
+                        fontSize: '0.7rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.16em',
+                        background: driveEnabled
+                          ? skin.driveOnBg
+                          : skin.driveOffBg,
+                        color: skin.driveTextColor,
+                        cursor: 'pointer',
+                        boxShadow: driveEnabled
+                          ? skin.controlOnShadow
+                          : skin.controlOffShadow,
+                      }}
+                    >
+                      {driveEnabled ? 'Drive On' : 'Drive Off'}
+                    </button>
+                  </div>
 
-                <Knob
-                  label="Tone"
-                  min={0}
-                  max={100}
-                  value={ampTone * 100}
-                  onChange={(v) => {
-                    setAmpTone(v / 100);
-                    markCustom();
-                  }}
-                  display={`${Math.round(ampTone * 10)}/10`}
-                  labelColor={skin.knobLabelColor}
-                  valueColor={skin.knobValueColor}
-                  faceGradient={skin.knobFaceGradient}
-                />
+                  {/* Modos de sitar */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '0.4rem',
+                      marginBottom: '0.4rem',
+                      marginLeft: '226px',
+                    }}
+                  >
+                    {(Object.keys(modeLabels) as SitarMode[]).map((mode) => {
+                      const active = sitarMode === mode;
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => {
+                            setSitarMode(mode);
+                            markCustom();
+                          }}
+                          style={{
+                            padding: '0.25rem 0.75rem',
+                            fontSize: '0.65rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.12em',
+                            borderRadius: 999,
+                            border: active
+                              ? skin.modeActiveBorder
+                              : '1px solid transparent',
+                            background: active
+                              ? skin.modeActiveBg
+                              : skin.modeInactiveBg,
+                            color: active
+                              ? skin.modeActiveColor
+                              : skin.modeInactiveColor,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {modeLabels[mode]}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                <Knob
-                  label="Sitar"
-                  min={0}
-                  max={100}
-                  value={sitarAmount * 100}
-                  onChange={(v) => {
-                    setSitarAmount(v / 100);
-                    markCustom();
-                  }}
-                  display={`${Math.round(sitarAmount * 100)}%`}
-                  labelColor={skin.knobLabelColor}
-                  valueColor={skin.knobValueColor}
-                  faceGradient={skin.knobFaceGradient}
-                />
+                  {/* Controles (knobs) */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '1.8rem',
+                      justifyContent: 'flex-start',
+                      flexWrap: 'wrap',
+                      marginLeft: '201px',
+                    }}
+                  >
+                    {/* Fila 1: Gain / Bass / Mid / Treble */}
+                    <Knob
+                      label="Gain"
+                      min={0}
+                      max={200}
+                      value={ampGain * 100}
+                      onChange={(v) => {
+                        setAmpGain(v / 100);
+                        markCustom();
+                      }}
+                      display={ampGain.toFixed(2)}
+                      labelColor={skin.knobLabelColor}
+                      valueColor={skin.knobValueColor}
+                      faceGradient={skin.knobFaceGradient}
+                    />
 
-                <Knob
-                  label="Master"
-                  min={0}
-                  max={200}
-                  value={ampMaster * 100}
-                  onChange={(v) => {
-                    setAmpMaster(v / 100);
-                    markCustom();
-                  }}
-                  display={ampMaster.toFixed(2)}
-                  labelColor={skin.knobLabelColor}
-                  valueColor={skin.knobValueColor}
-                  faceGradient={skin.knobFaceGradient}
-                />
+                    <Knob
+                      label="Bass"
+                      min={0}
+                      max={100}
+                      value={bassAmount * 100}
+                      onChange={(v) => {
+                        setBassAmount(v / 100);
+                        markCustom();
+                      }}
+                      display={`${Math.round(bassAmount * 10)}/10`}
+                      labelColor={skin.knobLabelColor}
+                      valueColor={skin.knobValueColor}
+                      faceGradient={skin.knobFaceGradient}
+                    />
 
-                <Knob
-                  label="Drive"
-                  min={0}
-                  max={100}
-                  value={driveAmount * 100}
-                  onChange={(v) => {
-                    setDriveAmount(v / 100);
-                    markCustom();
-                  }}
-                  display={`${Math.round(driveAmount * 100)}%`}
-                  labelColor={skin.knobLabelColor}
-                  valueColor={skin.knobValueColor}
-                  faceGradient={skin.knobFaceGradient}
-                />
+                    <Knob
+                      label="Mid"
+                      min={0}
+                      max={100}
+                      value={midAmount * 100}
+                      onChange={(v) => {
+                        setMidAmount(v / 100);
+                        markCustom();
+                      }}
+                      display={`${Math.round(midAmount * 10)}/10`}
+                      labelColor={skin.knobLabelColor}
+                      valueColor={skin.knobValueColor}
+                      faceGradient={skin.knobFaceGradient}
+                    />
 
-                <Knob
-                  label="Reverb"
-                  min={0}
-                  max={100}
-                  value={reverbAmount * 100}
-                  onChange={(v) => {
-                    setReverbAmount(v / 100);
-                    markCustom();
+                    <Knob
+                      label="Treble"
+                      min={0}
+                      max={100}
+                      value={trebleAmount * 100}
+                      onChange={(v) => {
+                        setTrebleAmount(v / 100);
+                        markCustom();
+                      }}
+                      display={`${Math.round(trebleAmount * 10)}/10`}
+                      labelColor={skin.knobLabelColor}
+                      valueColor={skin.knobValueColor}
+                      faceGradient={skin.knobFaceGradient}
+                    />
+
+                    {/* Fila 2: Presence / Tone / Sitar / Master / Drive / Reverb */}
+                    <Knob
+                      label="Presence"
+                      min={0}
+                      max={100}
+                      value={presenceAmount * 100}
+                      onChange={(v) => {
+                        setPresenceAmount(v / 100);
+                        markCustom();
+                      }}
+                      display={`${Math.round(presenceAmount * 10)}/10`}
+                      labelColor={skin.knobLabelColor}
+                      valueColor={skin.knobValueColor}
+                      faceGradient={skin.knobFaceGradient}
+                    />
+
+                    <Knob
+                      label="Tone"
+                      min={0}
+                      max={100}
+                      value={ampTone * 100}
+                      onChange={(v) => {
+                        setAmpTone(v / 100);
+                        markCustom();
+                      }}
+                      display={`${Math.round(ampTone * 10)}/10`}
+                      labelColor={skin.knobLabelColor}
+                      valueColor={skin.knobValueColor}
+                      faceGradient={skin.knobFaceGradient}
+                    />
+
+                    <Knob
+                      label="Sitar"
+                      min={0}
+                      max={100}
+                      value={sitarAmount * 100}
+                      onChange={(v) => {
+                        setSitarAmount(v / 100);
+                        markCustom();
+                      }}
+                      display={`${Math.round(sitarAmount * 100)}%`}
+                      labelColor={skin.knobLabelColor}
+                      valueColor={skin.knobValueColor}
+                      faceGradient={skin.knobFaceGradient}
+                    />
+
+                    <Knob
+                      label="Master"
+                      min={0}
+                      max={200}
+                      value={ampMaster * 100}
+                      onChange={(v) => {
+                        setAmpMaster(v / 100);
+                        markCustom();
+                      }}
+                      display={ampMaster.toFixed(2)}
+                      labelColor={skin.knobLabelColor}
+                      valueColor={skin.knobValueColor}
+                      faceGradient={skin.knobFaceGradient}
+                    />
+
+                    <Knob
+                      label="Drive"
+                      min={0}
+                      max={100}
+                      value={driveAmount * 100}
+                      onChange={(v) => {
+                        setDriveAmount(v / 100);
+                        markCustom();
+                      }}
+                      display={`${Math.round(driveAmount * 100)}%`}
+                      labelColor={skin.knobLabelColor}
+                      valueColor={skin.knobValueColor}
+                      faceGradient={skin.knobFaceGradient}
+                    />
+
+                    <Knob
+                      label="Reverb"
+                      min={0}
+                      max={100}
+                      value={reverbAmount * 100}
+                      onChange={(v) => {
+                        setReverbAmount(v / 100);
+                        markCustom();
+                      }}
+                      display={`${Math.round(reverbAmount * 100)}%`}
+                      labelColor={skin.knobLabelColor}
+                      valueColor={skin.knobValueColor}
+                      faceGradient={skin.knobFaceGradient}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* ---------- PANEL PEDAL DELAY ---------- */}
+              {subPanel === 'pedals' && (
+                <div
+                  style={{
+                    marginTop: '0.8rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    backgroundColor: pedalsBgColor,
+                    gap: '0.8rem',
                   }}
-                  display={`${Math.round(reverbAmount * 100)}%`}
-                  labelColor={skin.knobLabelColor}
-                  valueColor={skin.knobValueColor}
-                  faceGradient={skin.knobFaceGradient}
-                />
-              </div>
+                >
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: 260,
+                      height: 420,
+                      backgroundImage: `url(${pedalImg})`,
+                      backgroundSize: 'contain',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'center',
+                      display: 'flex',
+                      alignItems: 'flex-end',
+                      justifyContent: 'center',
+                      paddingBottom: '1.4rem',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        padding: '0.4rem 0.7rem',
+                        borderRadius: 999,
+                        backdropFilter: 'blur(4px)',
+                        position: 'absolute',
+                        top: '255px',
+                      }}
+                    >
+                      <Knob
+                        label="Time"
+                        min={50}
+                        max={1000}
+                        value={delayTimeMs}
+                        onChange={(v) => {
+                          setDelayTimeMs(v);
+                          markCustom();
+                        }}
+                        display={`${Math.round(delayTimeMs)} ms`}
+                        labelColor={skin.knobLabelColor}
+                        valueColor={skin.knobValueColor}
+                        faceGradient={skin.knobFaceGradient}
+                      />
+
+                      <Knob
+                        label="Feedback"
+                        min={0}
+                        max={90}
+                        value={feedbackAmount * 100}
+                        onChange={(v) => {
+                          setFeedbackAmount(v / 100);
+                          markCustom();
+                        }}
+                        display={`${Math.round(feedbackAmount * 100)}%`}
+                        labelColor={skin.knobLabelColor}
+                        valueColor={skin.knobValueColor}
+                        faceGradient={skin.knobFaceGradient}
+                      />
+
+                      <Knob
+                        label="Mix"
+                        min={0}
+                        max={100}
+                        value={mixAmount * 100}
+                        onChange={(v) => {
+                          setMixAmount(v / 100);
+                          markCustom();
+                        }}
+                        display={`${Math.round(mixAmount * 100)}%`}
+                        labelColor={skin.knobLabelColor}
+                        valueColor={skin.knobValueColor}
+                        faceGradient={skin.knobFaceGradient}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Footswitch del delay */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDelayEnabled(!delayEnabled);
+                      markCustom();
+                    }}
+                    style={{
+                      padding: '0.55rem 1.4rem',
+                      borderRadius: '999px',
+                      border: delayEnabled
+                        ? skin.delayOnBorder
+                        : skin.delayOffBorder,
+                      background: delayEnabled
+                        ? skin.delayOnBg
+                        : skin.delayOffBg,
+                      color: delayEnabled
+                        ? skin.delayOnTextColor
+                        : skin.delayOffTextColor,
+                      fontSize: '0.7rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.16em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      cursor: 'pointer',
+                      position: 'absolute',
+                      marginTop: '101px',
+                      boxShadow: delayEnabled
+                        ? skin.controlOnShadow
+                        : skin.controlOffShadow,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '999px',
+                        background: delayEnabled
+                          ? skin.delayOnDotBg
+                          : skin.delayOffDotBg,
+                      }}
+                    />
+                    {delayEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

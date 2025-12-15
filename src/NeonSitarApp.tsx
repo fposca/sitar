@@ -1,16 +1,18 @@
+// src/NeonSitarApp.tsx
 import React from 'react';
 import { AudioEngineProvider, useAudioEngine } from './audio/AudioEngineProvider';
 import BackingTrackPanel from './components/BackingTrackPanel';
 import GuitarInputPanel from './components/GuitarInputPanel';
-import DelayPanel from './components/DelayPanel';
 import RecordingPanel from './components/RecordingPanel';
 import AmpPanel from './components/AmpPanel';
 import neonboy from '../src/assets/neonboy.png';
 import MetronomePanel from './components/MetronomePanel';
 import OfflineSitarPanel from './ui/OfflineSitarPanel';
+import { useAuth } from './auth/AuthProvider'; // 👈 NUEVO
 
 const NeonSitarLayout: React.FC = () => {
   const { status } = useAudioEngine();
+  const { user, logout } = useAuth(); // 👈 NUEVO
 
   return (
     <div
@@ -33,29 +35,79 @@ const NeonSitarLayout: React.FC = () => {
           gap: '1.5rem',
         }}
       >
-        <header style={{ marginBottom: '0.5rem' }}>
-          <h1
+        {/* HEADER */}
+        <header
+          style={{
+            marginBottom: '0.5rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '1rem',
+          }}
+        >
+          {/* Logo + estado del motor */}
+          <div>
+            <img
+              style={{
+                width: '250px',
+                filter: 'drop-shadow(0 0 14px rgba(236,72,153,0.7))',
+              }}
+              src={neonboy}
+              alt="NeonBoy"
+            />
+            <p style={{ opacity: 0.8, marginTop: '0.25rem', fontSize: '0.8rem' }}>
+              {status}
+            </p>
+          </div>
+
+          {/* Info de usuario + botón de logout */}
+          <div
             style={{
-              fontSize: '1.8rem',
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              position:'absolute',
-              right:'15%'
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              fontSize: '0.85rem',
             }}
           >
-          <img style={{width: '250px'}} src={neonboy}></img>
-          </h1>
-          <p style={{ opacity: 0.8, marginTop: '0.25rem' }}>{status}</p>
+            {user && (
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 600 }}>
+                  {user.displayName ?? user.email}
+                </div>
+                <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                  Sesión Neon Sitar
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={logout}
+              style={{
+                padding: '0.4rem 0.9rem',
+                borderRadius: 999,
+                border: '1px solid #4b5563',
+                background: '#111827',
+                color: '#e5e7eb',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+            >
+              🚪 <span>Salir</span>
+            </button>
+          </div>
         </header>
 
+        {/* CONTENIDO */}
         <div
           style={{
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'flex-start',
             gap: '1.5rem',
-            // si querés que nunca se rompa en mobile, podés quitar el flexWrap
             flexWrap: 'nowrap',
           }}
         >
@@ -69,9 +121,9 @@ const NeonSitarLayout: React.FC = () => {
               gap: '1rem',
             }}
           >
+             <GuitarInputPanel />
             <BackingTrackPanel />
-            <GuitarInputPanel />
-            <DelayPanel />
+           
             <MetronomePanel />
             <RecordingPanel />
             <OfflineSitarPanel />
@@ -81,7 +133,7 @@ const NeonSitarLayout: React.FC = () => {
           <div
             style={{
               flex: 1,
-              minWidth: '0', // importante para que el flex pueda encogerse bien
+              minWidth: '0',
             }}
           >
             <AmpPanel />

@@ -15,7 +15,7 @@ const GuitarInputPanel: React.FC = () => {
         background: '#0b1020',
       }}
     >
-      <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>2. Entrada de guitarra</h2>
+      <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>Entrada de guitarra</h2>
       <button
         type="button"
         onClick={setupGuitarInput}

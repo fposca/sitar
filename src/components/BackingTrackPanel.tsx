@@ -84,7 +84,7 @@ const { masterVolume, setMasterVolume } = useAudioEngine();
       }}
     >
     
-      <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>1. Backing track</h2>
+      <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>Backing track</h2>
 
       <input type="file" accept="audio/*" onChange={handleChange} />
       {hasBacking && (
