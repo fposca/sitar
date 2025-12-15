@@ -16,7 +16,11 @@ export type AudioEngineContextValue = {
   stopMetronome: () => void;
   metronomeVolume: number;
   setMetronomeVolume: (v: number) => void;
-
+      // 🔹 Procesar archivo offline con el Sitar
+  processFileThroughSitar: (file: File) => Promise<void>;
+  playProcessed: () => void;
+  exportProcessed: () => void;
+  
 masterVolume: number;
 setMasterVolume: (v: number) => void;
 

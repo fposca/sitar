@@ -10,6 +10,78 @@ import React, {
 import type { AudioEngineContextValue, SitarMode } from './audioTypes';
 import { applySitarMode, makeDriveCurve, computeWaveform } from './audioDSP';
 
+// Convierte un AudioBuffer en un ArrayBuffer con formato WAV PCM 16-bit
+function audioBufferToWav(buffer: AudioBuffer): ArrayBuffer {
+  const numChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const samples = buffer.length;
+  const bitDepth = 16;
+  const format = 1; // PCM
+
+  const blockAlign = (numChannels * bitDepth) / 8;
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = samples * blockAlign;
+  const bufferSize = 44 + dataSize;
+
+  const wav = new ArrayBuffer(bufferSize);
+  const view = new DataView(wav);
+
+  let offset = 0;
+
+  const writeString = (str: string) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset++, str.charCodeAt(i));
+    }
+  };
+
+  const writeUint32 = (val: number) => {
+    view.setUint32(offset, val, true);
+    offset += 4;
+  };
+
+  const writeUint16 = (val: number) => {
+    view.setUint16(offset, val, true);
+    offset += 2;
+  };
+
+  // RIFF header
+  writeString('RIFF');
+  writeUint32(36 + dataSize);
+  writeString('WAVE');
+
+  // fmt chunk
+  writeString('fmt ');
+  writeUint32(16); // tamaño del subchunk
+  writeUint16(format);
+  writeUint16(numChannels);
+  writeUint32(sampleRate);
+  writeUint32(byteRate);
+  writeUint16(blockAlign);
+  writeUint16(bitDepth);
+
+  // data chunk
+  writeString('data');
+  writeUint32(dataSize);
+
+  // Samples intercalados
+  const channelData: Float32Array[] = [];
+  for (let ch = 0; ch < numChannels; ch++) {
+    channelData.push(buffer.getChannelData(ch));
+  }
+
+  for (let i = 0; i < samples; i++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      let sample = channelData[ch][i];
+      sample = Math.max(-1, Math.min(1, sample)); // clamp
+      const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+      view.setInt16(offset, intSample, true);
+      offset += 2;
+    }
+  }
+
+  return wav;
+}
+
 const AudioEngineContext = createContext<AudioEngineContextValue | null>(null);
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -75,17 +147,21 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // 🔹 Volumen del backing track (0–1)
   const [backingVolume, setBackingVolume] = useState(0.7);
 
+  // Buffer procesado offline
+  const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
+
   // Tiempo de grabación
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingStartTimeRef = useRef<number | null>(null);
   const recordingTimerIdRef = useRef<number | null>(null);
 
+  // Fuente para pre-escuchar el audio procesado
+  const offlinePreviewSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
   const guitarStreamRef = useRef<MediaStream | null>(null);
   const guitarSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const backingSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(
-    null,
-  );
+  const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
 
@@ -195,6 +271,58 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       }
     };
   }, [audioContext, bpm, metronomeOn, metronomeVolume]);
+
+  // ---------- PLAY / EXPORT DEL PROCESADO OFFLINE ----------
+
+  const playProcessed = useCallback(() => {
+    if (!processedBuffer) {
+      setStatus('No hay audio procesado todavía.');
+      return;
+    }
+
+    const ctx = getOrCreateAudioContext();
+
+    // parar preview anterior si hubiera
+    if (offlinePreviewSourceRef.current) {
+      try {
+        offlinePreviewSourceRef.current.stop();
+      } catch {
+        // ignore
+      }
+      offlinePreviewSourceRef.current.disconnect();
+      offlinePreviewSourceRef.current = null;
+    }
+
+    const src = ctx.createBufferSource();
+    src.buffer = processedBuffer;
+    src.connect(ctx.destination);
+    src.start();
+
+    offlinePreviewSourceRef.current = src;
+    setStatus('Reproduciendo audio procesado...');
+  }, [processedBuffer, getOrCreateAudioContext]);
+
+  const exportProcessed = useCallback(() => {
+    if (!processedBuffer) {
+      setStatus('No hay audio procesado para exportar.');
+      return;
+    }
+
+    const wavArrayBuffer = audioBufferToWav(processedBuffer);
+    const blob = new Blob([wavArrayBuffer], { type: 'audio/wav' });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = 'neon-sitar-processed.wav';
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    setStatus('Archivo procesado exportado como WAV 🎧');
+  }, [processedBuffer]);
 
   // simple IR para reverb (ruido con decay)
   const getReverbImpulse = useCallback(
@@ -512,6 +640,173 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       }
     },
     [getOrCreateAudioContext],
+  );
+
+  // Procesar un archivo a través del Sitar Amp usando OfflineAudioContext
+  const processFileThroughSitar = useCallback(
+    async (file: File) => {
+      try {
+        const mainCtx = getOrCreateAudioContext();
+        const arrayBuffer = await file.arrayBuffer();
+        const decoded = await mainCtx.decodeAudioData(arrayBuffer);
+
+        const offlineCtx = new OfflineAudioContext(
+          decoded.numberOfChannels,
+          decoded.length,
+          decoded.sampleRate,
+        );
+
+        const src = offlineCtx.createBufferSource();
+        src.buffer = decoded;
+
+        // === Grafo simplificado tipo SitarAmp ===
+        const inputGain = offlineCtx.createGain();
+        inputGain.gain.value = 1;
+
+        // Drive
+        const driveNode = offlineCtx.createWaveShaper();
+        driveNode.curve = makeDriveCurve(driveEnabled ? driveAmount * 6 : 0);
+        driveNode.oversample = '4x';
+
+        // Tone (lowpass sencillo)
+        const toneFilter = offlineCtx.createBiquadFilter();
+        toneFilter.type = 'lowpass';
+        const minFreq = 200;
+        const maxFreq = 16000;
+        toneFilter.frequency.value = minFreq + ampTone * (maxFreq - minFreq);
+
+        // Sitar
+        const sitarDryGain = offlineCtx.createGain();
+        sitarDryGain.gain.value = 1 - sitarAmount;
+
+        const sitarWetGain = offlineCtx.createGain();
+        sitarWetGain.gain.value = sitarAmount;
+
+        const sitarBandpass = offlineCtx.createBiquadFilter();
+        sitarBandpass.type = 'bandpass';
+
+        const sitarSympathetic = offlineCtx.createBiquadFilter();
+        sitarSympathetic.type = 'bandpass';
+
+        const jawariDrive = offlineCtx.createWaveShaper();
+        jawariDrive.curve = makeDriveCurve(4.0);
+        jawariDrive.oversample = '4x';
+
+        const jawariDelay = offlineCtx.createDelay(0.02);
+        jawariDelay.delayTime.value = 0.0015;
+
+        const jawariFeedback = offlineCtx.createGain();
+        jawariFeedback.gain.value = 0.35;
+
+        const jawariHighpass = offlineCtx.createBiquadFilter();
+        jawariHighpass.type = 'highpass';
+        jawariHighpass.frequency.value = 1800;
+
+        applySitarMode(sitarMode, {
+          sitarBandpass,
+          sitarSympathetic,
+          jawariDrive,
+          jawariHighpass,
+        });
+
+        // Delay
+        const preDelayGain = offlineCtx.createGain();
+
+        const dryGain = offlineCtx.createGain();
+        dryGain.gain.value = 1 - mixAmount;
+
+        const wetGain = offlineCtx.createGain();
+        wetGain.gain.value = delayEnabled ? mixAmount : 0;
+
+        const delayNode = offlineCtx.createDelay(2.0);
+        delayNode.delayTime.value = delayTimeMs / 1000;
+
+        const feedbackGain = offlineCtx.createGain();
+        feedbackGain.gain.value = feedbackAmount;
+
+        // Master + reverb
+        const masterGainNode = offlineCtx.createGain();
+        masterGainNode.gain.value = ampMaster * 3.0 * masterVolume;
+
+        const reverbDry = offlineCtx.createGain();
+        const reverbWet = offlineCtx.createGain();
+        reverbDry.gain.value = 1 - reverbAmount;
+        reverbWet.gain.value = reverbAmount;
+
+        const reverb = offlineCtx.createConvolver();
+        // reutilizamos el generador de IR
+        reverb.buffer = getReverbImpulse(offlineCtx as unknown as AudioContext);
+
+        // === Conexiones ===
+        src.connect(inputGain);
+        inputGain.connect(driveNode);
+        driveNode.connect(toneFilter);
+
+        // sitar dry
+        toneFilter.connect(sitarDryGain);
+
+        // sitar “jawari”
+        toneFilter.connect(sitarBandpass);
+        sitarBandpass.connect(jawariDrive);
+        jawariDrive.connect(jawariDelay);
+        jawariDelay.connect(jawariFeedback);
+        jawariFeedback.connect(jawariDelay);
+        jawariDelay.connect(jawariHighpass);
+        jawariHighpass.connect(sitarWetGain);
+
+        // sitar “sympathetic”
+        toneFilter.connect(sitarSympathetic);
+        sitarSympathetic.connect(sitarWetGain);
+
+        // mix sitar
+        sitarDryGain.connect(preDelayGain);
+        sitarWetGain.connect(preDelayGain);
+
+        // delay
+        preDelayGain.connect(dryGain);
+        preDelayGain.connect(delayNode);
+        delayNode.connect(wetGain);
+        delayNode.connect(feedbackGain);
+        feedbackGain.connect(delayNode);
+
+        // to master
+        dryGain.connect(masterGainNode);
+        wetGain.connect(masterGainNode);
+
+        // reverb
+        masterGainNode.connect(reverbDry);
+        masterGainNode.connect(reverb);
+        reverb.connect(reverbWet);
+
+        reverbDry.connect(offlineCtx.destination);
+        reverbWet.connect(offlineCtx.destination);
+
+        src.start(0);
+
+        const rendered = await offlineCtx.startRendering();
+        setProcessedBuffer(rendered);
+        setStatus('Archivo procesado con Neon Sitar ✅');
+      } catch (err) {
+        console.error(err);
+        setStatus('Error al procesar archivo con Neon Sitar');
+      }
+    },
+    [
+      getOrCreateAudioContext,
+      delayTimeMs,
+      feedbackAmount,
+      mixAmount,
+      delayEnabled,
+      reverbAmount,
+      sitarAmount,
+      sitarMode,
+      ampMaster,
+      ampTone,
+      driveAmount,
+      driveEnabled,
+      masterVolume,
+      getReverbImpulse,
+    ],
   );
 
   const setupRecordingGraph = useCallback(() => {
@@ -1040,14 +1335,20 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     monitorEnabled,
     setMonitorEnabled,
 
+    // Master global
+    masterVolume,
+    setMasterVolume,
+
+    // Procesado offline
+    processFileThroughSitar,
+    playProcessed,
+    exportProcessed,
+
     setupGuitarInput,
     loadBackingFile,
     startPlaybackAndRecording,
     stopRecording,
     recordingSeconds,
-
-    masterVolume,
-    setMasterVolume,
   };
 
   return (

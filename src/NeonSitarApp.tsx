@@ -7,6 +7,7 @@ import RecordingPanel from './components/RecordingPanel';
 import AmpPanel from './components/AmpPanel';
 import neonboy from '../src/assets/neonboy.png';
 import MetronomePanel from './components/MetronomePanel';
+import OfflineSitarPanel from './ui/OfflineSitarPanel';
 
 const NeonSitarLayout: React.FC = () => {
   const { status } = useAudioEngine();
@@ -73,6 +74,7 @@ const NeonSitarLayout: React.FC = () => {
             <DelayPanel />
             <MetronomePanel />
             <RecordingPanel />
+            <OfflineSitarPanel />
           </div>
 
           {/* Columna derecha: el ampli ocupa todo el resto */}
