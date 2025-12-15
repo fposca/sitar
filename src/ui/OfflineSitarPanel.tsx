@@ -1,16 +1,125 @@
 // src/ui/OfflineSitarPanel.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAudioEngine } from '../audio/AudioEngineProvider';
+
+type WaveformDisplayProps = {
+  waveform: number[] | null;
+};
+
+const WaveformDisplay: React.FC<WaveformDisplayProps> = ({ waveform }) => {
+  if (!waveform || waveform.length === 0) {
+    return (
+      <div
+        style={{
+          height: 90,
+          borderRadius: 8,
+          background: '#020617',
+          border: '1px solid #1f2937',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '0.8rem',
+          color: '#e5e7eb',
+          marginBottom: '0.75rem',
+          textAlign: 'center',
+          padding: '0 0.5rem',
+        }}
+      >
+        Procesá un archivo con el Sitar Amp para ver la forma de onda.
+      </div>
+    );
+  }
+
+  const bars = useMemo(() => {
+    const targetBars = 120;
+    const step = Math.max(1, Math.floor(waveform.length / targetBars));
+    const result: number[] = [];
+
+    for (let i = 0; i < waveform.length; i += step) {
+      let peak = 0;
+      for (let j = i; j < i + step && j < waveform.length; j++) {
+        const v = Math.abs(waveform[j]);
+        if (v > peak) peak = v;
+      }
+      result.push(peak);
+    }
+
+    return result;
+  }, [waveform]);
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        height: 90,
+        borderRadius: 8,
+        background: '#020617',
+        border: '1px solid #1f2937',
+        overflow: 'hidden',
+        padding: '6px 4px',
+        marginBottom: '0.75rem',
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: '50%',
+          height: 1,
+          background: '#111827',
+        }}
+      />
+      <div
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          height: '100%',
+        }}
+      >
+        {bars.map((v, i) => {
+          const clamped = Math.max(0, Math.min(1, v));
+          const h = 10 + clamped * 80;
+
+          return (
+            <div
+              key={i}
+              style={{
+                width: 3,
+                margin: '0 1px',
+                alignSelf: 'center',
+                height: `${h}%`,
+                borderRadius: 999,
+                background:
+                  'linear-gradient(180deg, #f97316 0%, #fb923c 40%, #f97316 100%)',
+                boxShadow: '0 0 8px rgba(249, 115, 22, 0.7)',
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const OfflineSitarPanel: React.FC = () => {
   const {
     processFileThroughSitar,
     playProcessed,
+    stopProcessed,
     exportProcessed,
+    processedWaveform,
+    offlineVolume,
+    setOfflineVolume,
   } = useAudioEngine();
 
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    console.log('processedWaveform length:', processedWaveform?.length ?? 0);
+  }, [processedWaveform]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] ?? null;
@@ -27,13 +136,15 @@ const OfflineSitarPanel: React.FC = () => {
     }
   };
 
+  const hasProcessed = !!processedWaveform && processedWaveform.length > 0;
+
   return (
     <section
       style={{
         border: '1px solid #333',
         borderRadius: '12px',
         padding: '1rem 1.5rem',
-        maxWidth: '260px',
+        maxWidth: '340px',
         width: '100%',
         background: '#050816',
         marginTop: '1rem',
@@ -75,50 +186,113 @@ const OfflineSitarPanel: React.FC = () => {
           fontSize: '0.9rem',
           fontWeight: 600,
           marginBottom: '0.75rem',
+          boxShadow: isProcessing
+            ? 'none'
+            : '0 0 12px rgba(249, 115, 22, 0.6)',
         }}
       >
         {isProcessing ? 'Procesando...' : 'Aplicar Sitar Amp'}
       </button>
 
+      {/* gráfico */}
+      <WaveformDisplay waveform={processedWaveform} />
+
+      {/* Volumen de preview */}
+      <div
+        style={{
+          marginBottom: '0.75rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.25rem',
+          fontSize: '0.75rem',
+          color: '#9ca3af',
+        }}
+      >
+        <span>Volumen preview</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={offlineVolume}
+          onChange={(e) => setOfflineVolume(parseFloat(e.target.value))}
+          style={{ width: '100%' }}
+        />
+      </div>
+
+      {/* Controles */}
       <div
         style={{
           display: 'flex',
-          gap: '0.5rem',
+          gap: '0.4rem',
           justifyContent: 'space-between',
         }}
       >
         <button
           type="button"
           onClick={playProcessed}
+          disabled={!hasProcessed}
           style={{
             flex: 1,
             padding: '0.35rem 0.6rem',
             borderRadius: '999px',
-            border: '1px solid #334155',
-            background: '#0f172a',
-            color: '#e5e7eb',
+            border: hasProcessed ? 'none' : '1px solid #1f2937',
+            background: hasProcessed ? '#f97316' : '#1f2937',
+            color: hasProcessed ? '#fff' : '#4b5563',
             fontSize: '0.8rem',
-            cursor: 'pointer',
+            cursor: hasProcessed ? 'pointer' : 'default',
+            boxShadow: hasProcessed
+              ? '0 0 8px rgba(249, 115, 22, 0.6)'
+              : 'none',
           }}
         >
-          Escuchar
+          ▶ Escuchar
+        </button>
+
+        <button
+          type="button"
+          onClick={stopProcessed}
+          disabled={!hasProcessed}
+          style={{
+            flex: 1,
+            padding: '0.35rem 0.6rem',
+            borderRadius: '999px',
+            border: hasProcessed ? 'none' : '1px solid #1f2937',
+            background: hasProcessed ? '#b91c1c' : '#1f2937',
+            color: hasProcessed ? '#fff' : '#4b5563',
+            fontSize: '0.8rem',
+            cursor: hasProcessed ? 'pointer' : 'default',
+            boxShadow: hasProcessed
+              ? '0 0 8px rgba(248, 113, 113, 0.6)'
+              : 'none',
+          }}
+        >
+          ⏹ Detener
         </button>
 
         <button
           type="button"
           onClick={exportProcessed}
+          disabled={!hasProcessed}
           style={{
-            flex: 1,
+            flex: 1.2,
             padding: '0.35rem 0.6rem',
             borderRadius: '999px',
-            border: '1px solid #334155',
-            background: '#0f172a',
-            color: '#e5e7eb',
+            border: hasProcessed ? 'none' : '1px solid #1f2937',
+            background: hasProcessed ? '#0f766e' : '#1f2937',
+            color: hasProcessed ? '#e5e7eb' : '#4b5563',
             fontSize: '0.8rem',
-            cursor: 'pointer',
+            cursor: hasProcessed ? 'pointer' : 'default',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.25rem',
+            boxShadow: hasProcessed
+              ? '0 0 8px rgba(45, 212, 191, 0.5)'
+              : 'none',
           }}
         >
-          Exportar WAV
+          ⬇ Exportar WAV
         </button>
       </div>
     </section>

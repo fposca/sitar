@@ -1,5 +1,6 @@
 // src/audio/AudioEngineProvider.tsx
-import React, {
+import React,
+{
   createContext,
   useCallback,
   useContext,
@@ -149,12 +150,16 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
   // Buffer procesado offline
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
+  const [processedWaveform, setProcessedWaveform] = useState<number[] | null>(null);
+   // Volumen de preview offline (0–1)
+  const [offlineVolume, setOfflineVolume] = useState(1.0);
 
   // Tiempo de grabación
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingStartTimeRef = useRef<number | null>(null);
   const recordingTimerIdRef = useRef<number | null>(null);
-
+ // Fuente para pre-escuchar el audio procesado
+  const offlinePreviewGainRef = useRef<GainNode | null>(null);
   // Fuente para pre-escuchar el audio procesado
   const offlinePreviewSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
@@ -274,7 +279,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
   // ---------- PLAY / EXPORT DEL PROCESADO OFFLINE ----------
 
-  const playProcessed = useCallback(() => {
+    const playProcessed = useCallback(() => {
     if (!processedBuffer) {
       setStatus('No hay audio procesado todavía.');
       return;
@@ -293,14 +298,38 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       offlinePreviewSourceRef.current = null;
     }
 
+    // crear / actualizar gain de preview
+    if (!offlinePreviewGainRef.current) {
+      const g = ctx.createGain();
+      g.gain.value = offlineVolume;
+      g.connect(ctx.destination);
+      offlinePreviewGainRef.current = g;
+    } else {
+      offlinePreviewGainRef.current.gain.value = offlineVolume;
+    }
+
     const src = ctx.createBufferSource();
     src.buffer = processedBuffer;
-    src.connect(ctx.destination);
+    src.connect(offlinePreviewGainRef.current);
     src.start();
 
     offlinePreviewSourceRef.current = src;
     setStatus('Reproduciendo audio procesado...');
-  }, [processedBuffer, getOrCreateAudioContext]);
+  }, [processedBuffer, getOrCreateAudioContext, offlineVolume]);
+
+
+  const stopProcessed = useCallback(() => {
+    if (offlinePreviewSourceRef.current) {
+      try {
+        offlinePreviewSourceRef.current.stop();
+      } catch {
+        // ignore
+      }
+      offlinePreviewSourceRef.current.disconnect();
+      offlinePreviewSourceRef.current = null;
+    }
+    setStatus('Reproducción detenida.');
+  }, []);
 
   const exportProcessed = useCallback(() => {
     if (!processedBuffer) {
@@ -785,6 +814,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
         const rendered = await offlineCtx.startRendering();
         setProcessedBuffer(rendered);
+        setProcessedWaveform(computeWaveform(rendered));
         setStatus('Archivo procesado con Neon Sitar ✅');
       } catch (err) {
         console.error(err);
@@ -1055,6 +1085,18 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       audioContext?.close();
     };
   }, [audioContext]);
+
+  // Volumen del preview offline en vivo
+  useEffect(() => {
+    if (!audioContext) return;
+    if (offlinePreviewGainRef.current) {
+      offlinePreviewGainRef.current.gain.setTargetAtTime(
+        offlineVolume,
+        audioContext.currentTime,
+        0.01,
+      );
+    }
+  }, [offlineVolume, audioContext]);
 
   // === Actualizar efectos en tiempo real ===
 
@@ -1342,7 +1384,13 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     // Procesado offline
     processFileThroughSitar,
     playProcessed,
+    stopProcessed,
     exportProcessed,
+    processedWaveform,
+    offlineVolume,
+    setOfflineVolume,
+
+
 
     setupGuitarInput,
     loadBackingFile,

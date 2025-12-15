@@ -8,22 +8,31 @@ export type AudioEngineContextValue = {
   isRecording: boolean;
   hasBacking: boolean;
 
-   // 🔹 Metronome
- bpm: number;
+  // 🔹 Metronome
+  bpm: number;
   setBpm: (v: number) => void;
   metronomeOn: boolean;
   startMetronome: () => void;
   stopMetronome: () => void;
   metronomeVolume: number;
   setMetronomeVolume: (v: number) => void;
-      // 🔹 Procesar archivo offline con el Sitar
+
+  // 🔹 Procesado offline
   processFileThroughSitar: (file: File) => Promise<void>;
   playProcessed: () => void;
+  stopProcessed: () => void;
   exportProcessed: () => void;
-  
-masterVolume: number;
-setMasterVolume: (v: number) => void;
+  processedWaveform: number[] | null;
 
+   // Volumen del preview offline
+  offlineVolume: number;
+  setOfflineVolume: (v: number) => void;
+
+  // Master global
+  masterVolume: number;
+  setMasterVolume: (v: number) => void;
+
+  // Volumen del backing
   backingVolume: number;
   setBackingVolume: (v: number) => void;
 
