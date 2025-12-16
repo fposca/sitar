@@ -189,7 +189,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const ragaFilterRef = useRef<BiquadFilterNode | null>(null);
   const ragaGainRef = useRef<GainNode | null>(null);
 
-
+// Sympathetic Strings (segundo resonador)
+const ragaSympatheticRef = useRef<BiquadFilterNode | null>(null);
+const ragaSympatheticGainRef = useRef<GainNode | null>(null);
 
   // para la animación del cursor
   const playbackStartTimeRef = useRef<number | null>(null);
@@ -511,6 +513,41 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     // Guardar refs para el live update
     ragaFilterRef.current = ragaBandpass;
     ragaGainRef.current = ragaGain;
+
+    // === SYMPATHETIC STRINGS — brillo super agudo estilo sitar ===
+
+// Filtro band-pass super agudo
+const ragaSym = ctx.createBiquadFilter();
+ragaSym.type = "bandpass";
+ragaSym.frequency.value = 7000;   // MUY agudo
+ragaSym.Q.value = 22;             // muy resonante / metálico
+
+// Tiny vibrato → vibración típica del sitar real
+const ragaLFO = ctx.createOscillator();
+ragaLFO.type = "sine";
+ragaLFO.frequency.value = 4.2; // vibración lenta estilo sitar
+
+const ragaLFOgain = ctx.createGain();
+ragaLFOgain.gain.value = 180; // mueve la frecuencia del resonador
+ragaLFO.connect(ragaLFOgain);
+ragaLFOgain.connect(ragaSym.frequency);
+ragaLFO.start();
+
+// ganancia de mezcla (controlada por el pedal Raga)
+const ragaSymGain = ctx.createGain();
+ragaSymGain.gain.value = 0; // se activa solo con el pedal
+
+// Conexión en paralelo
+toneFilter.connect(ragaSym);
+ragaSym.connect(ragaSymGain);
+ragaSymGain.connect(masterGain);
+
+// Referencias opcionales
+ragaSympatheticRef.current = ragaSym;
+ragaSympatheticGainRef.current = ragaSymGain;
+
+
+
 
 
     // === SITAR SECTION ===
@@ -1274,6 +1311,44 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       );
     }
   }, [ampTone, audioContext]);
+// === Live update de Sympathetic Strings según el pedal ===
+useEffect(() => {
+  if (!audioContext) return;
+  if (!ragaSympatheticGainRef.current || !ragaSympatheticRef.current) return;
+
+  const t = audioContext.currentTime;
+
+  // Si el pedal está apagado, cero mezcla
+  if (!ragaEnabled) {
+    ragaSympatheticGainRef.current.gain.setTargetAtTime(0, t, 0.01);
+    return;
+  }
+
+  // Mezcla proporcional al knob DRONE/LEVEL
+  ragaSympatheticGainRef.current.gain.setTargetAtTime(
+    ragaDroneLevel * 0.9,
+    t,
+    0.01
+  );
+
+  // Resonancia controlada por el knob RESONANCE
+  const minQ = 10;
+  const maxQ = 25;
+  ragaSympatheticRef.current.Q.setTargetAtTime(
+    minQ + (maxQ - minQ) * ragaResonance,
+    t,
+    0.01
+  );
+
+  // Color combina el rango
+  const minF = 5500;
+  const maxF = 9000;
+  ragaSympatheticRef.current.frequency.setTargetAtTime(
+    minF + ragaColor * (maxF - minF),
+    t,
+    0.01
+  );
+}, [audioContext, ragaEnabled, ragaDroneLevel, ragaResonance, ragaColor]);
 
   useEffect(() => {
     if (!audioContext) return;
