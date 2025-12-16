@@ -107,6 +107,17 @@ setRagaColor: (value: number) => void;
   // Tiempo grabando (en segundos)
   recordingSeconds: number;
 
+
+  // Valve Crunch (pedal aparte)
+valveEnabled: boolean;
+setValveEnabled: (v: boolean) => void;
+valveDrive: number; // 0..1
+setValveDrive: (v: number) => void;
+valveTone: number; // 0..1
+setValveTone: (v: number) => void;
+valveLevel: number; // 0..1
+setValveLevel: (v: number) => void;
+
   // Acciones
   setupGuitarInput: () => Promise<void>;
   loadBackingFile: (file: File) => Promise<void>;

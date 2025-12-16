@@ -14,6 +14,7 @@ import leadPanelImg from '../assets/input-lead.png';
 import infernalFrontImg from '../assets/nea-infernal.png';
 import infernalPanelImg from '../assets/input-infernal.png';
 import pedalImg from '../assets/pedal.png';
+import distoPedalImg from '../assets/disto.png';
 import sitarPedalImg from '../assets/pedal-sitar.png';
 
 const labelBase: React.CSSProperties = {
@@ -50,6 +51,7 @@ const Knob: React.FC<KnobProps> = ({
   labelColor,
   valueColor,
   faceGradient,
+  
 }) => {
   const percent = (value - min) / (max - min);
 
@@ -133,6 +135,7 @@ type PresetSettings = {
   reverbAmount: number;
   sitarAmount: number;
   sitarMode: SitarMode;
+  
 };
 
 const PRESETS: Record<
@@ -462,6 +465,15 @@ const AmpPanel: React.FC = () => {
     setFeedbackAmount,
     mixAmount,
     setMixAmount,
+     // 🔥 VALVE DISTO (ACÁ VA ESTO)
+  valveEnabled,
+  setValveEnabled,
+  valveDrive,
+  setValveDrive,
+  valveTone,
+  setValveTone,
+  valveLevel,
+  setValveLevel,
     // Sitar
     sitarAmount,
     setSitarAmount,
@@ -1155,7 +1167,7 @@ const AmpPanel: React.FC = () => {
                     borderRadius: 18,
                   }}
                 >
-             
+
 
                   <div
                     style={{
@@ -1289,6 +1301,122 @@ const AmpPanel: React.FC = () => {
                           }}
                         />
                         {delayEnabled ? 'Delay On' : 'Delay Off'}
+                      </button>
+                    </div>
+                    {/* --------- PEDAL DISTO+ (VALVE CRUNCH) ---------- */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.8rem',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: 260,
+                          height: 420,
+                          backgroundImage: `url(${distoPedalImg})`,
+                          backgroundSize: 'contain',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'center',
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          justifyContent: 'center',
+                          paddingBottom: '1.4rem',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            padding: '0.4rem 0.7rem',
+                            borderRadius: 999,
+                            backdropFilter: 'blur(4px)',
+                            background: 'rgba(0,0,0,0.45)',
+                            position: 'absolute',
+                            top: '255px',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <Knob
+                            label="Drive"
+                            min={0}
+                            max={100}
+                            value={valveDrive * 100}
+                            onChange={(v) => {
+                              setValveDrive(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(valveDrive * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+
+                          <Knob
+                            label="Tone"
+                            min={0}
+                            max={100}
+                            value={valveTone * 100}
+                            onChange={(v) => {
+                              setValveTone(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(valveTone * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+
+                          <Knob
+                            label="Level"
+                            min={0}
+                            max={120}
+                            value={valveLevel * 100}
+                            onChange={(v) => {
+                              setValveLevel(v / 100);
+                              markCustom();
+                            }}
+                            display={`${valveLevel.toFixed(2)}`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setValveEnabled(!valveEnabled);
+                          markCustom();
+                        }}
+                        style={{
+                          padding: '0.55rem 1.4rem',
+                          borderRadius: '999px',
+                          border: valveEnabled ? skin.delayOnBorder : skin.delayOffBorder,
+                          background: valveEnabled ? skin.modeActiveBg : 'transparent',
+                          color: valveEnabled ? skin.modeActiveColor : skin.modeInactiveColor,
+                          fontSize: '0.7rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.16em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          cursor: 'pointer',
+                          boxShadow: valveEnabled ? skin.controlOnShadow : skin.controlOffShadow,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '999px',
+                            background: valveEnabled ? skin.delayOnDotBg : skin.delayOffDotBg,
+                          }}
+                        />
+                        {valveEnabled ? 'Disto+ On' : 'Disto+ Off'}
                       </button>
                     </div>
 

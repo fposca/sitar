@@ -116,6 +116,13 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [feedbackAmount, setFeedbackAmount] = useState(0.4);
   const [mixAmount, setMixAmount] = useState(0.6);
 
+  // ✅ Valve Crunch
+const [valveEnabled, setValveEnabled] = useState(false);
+const [valveDrive, setValveDrive] = useState(0.55); // saturación
+const [valveTone, setValveTone] = useState(0.6);    // brillo
+const [valveLevel, setValveLevel] = useState(0.9);  // volumen pedal
+
+
   // Controles de ampli
   const [ampGain, setAmpGain] = useState(1.0); // 1 = unity
   const [ampTone, setAmpTone] = useState(0.5); // 0..1
@@ -184,6 +191,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   );
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+const valveShaperRef = useRef<WaveShaperNode | null>(null);
+const valveToneRef = useRef<BiquadFilterNode | null>(null);
+const valveLevelRef = useRef<GainNode | null>(null);
 
   // Raga pedal refs
   const ragaFilterRef = useRef<BiquadFilterNode | null>(null);
@@ -494,7 +504,10 @@ const ragaSympatheticGainRef = useRef<GainNode | null>(null);
     masterGain.gain.value = ampMaster * 2.0;
     masterGainRef.current = masterGain;
 
-        // === PEDAL RAGA (sin drone: resonador nasal en paralelo) ===
+    // Declare preSitarNode here before first use
+    let preSitarNode: AudioNode = toneFilter;
+
+    // === PEDAL RAGA (sin drone: resonador nasal en paralelo) ===
     const ragaBandpass = ctx.createBiquadFilter();
     ragaBandpass.type = 'bandpass';
     // valores base, después se actualizan por useEffect
@@ -506,7 +519,7 @@ const ragaSympatheticGainRef = useRef<GainNode | null>(null);
     ragaGain.gain.value = 0;
 
     // Cadena: toneFilter → ragaBandpass → ragaGain → masterGain
-    toneFilter.connect(ragaBandpass);
+    preSitarNode.connect(ragaBandpass);
     ragaBandpass.connect(ragaGain);
     ragaGain.connect(masterGain);
 
@@ -644,10 +657,33 @@ ragaSympatheticGainRef.current = ragaSymGain;
     ampGainNode.connect(driveNode);
     driveNode.connect(toneFilter);
 
-    // Sitar paths
-    toneFilter.connect(sitarDryGain);
+// === VALVE CRUNCH (pedal aparte) ===
+const valveShaper = ctx.createWaveShaper();
+valveShaper.curve = makeDriveCurve((valveEnabled ? valveDrive : 0) * 8); // crunch
+valveShaper.oversample = '4x';
+valveShaperRef.current = valveShaper;
 
-    toneFilter.connect(sitarBandpass);
+const valveToneFilter = ctx.createBiquadFilter();
+valveToneFilter.type = 'lowpass';
+valveToneFilter.frequency.value = 800 + valveTone * (16000 - 800);
+valveToneRef.current = valveToneFilter;
+
+const valveLevelGain = ctx.createGain();
+valveLevelGain.gain.value = valveEnabled ? valveLevel : 1.0;
+valveLevelRef.current = valveLevelGain;
+
+// Re-wire: driveNode -> toneFilter -> valve -> (de ahí sale todo el resto)
+toneFilter.connect(valveShaper);
+valveShaper.connect(valveToneFilter);
+valveToneFilter.connect(valveLevelGain);
+
+// IMPORTANTE: desde ahora usá `valveLevelGain` como “punto de salida” en vez de toneFilter
+preSitarNode = valveLevelGain;
+
+    // Sitar paths
+    preSitarNode.connect(sitarDryGain);
+
+    preSitarNode.connect(sitarBandpass);
     sitarBandpass.connect(jawariDrive);
     jawariDrive.connect(jawariDelay);
     jawariDelay.connect(jawariFeedback);
@@ -655,7 +691,7 @@ ragaSympatheticGainRef.current = ragaSymGain;
     jawariDelay.connect(jawariHighpass);
     jawariHighpass.connect(sitarWetGain);
 
-    toneFilter.connect(sitarSympathetic);
+    preSitarNode.connect(sitarSympathetic);
     sitarSympathetic.connect(sitarWetGain);
 
     // Mix dry + sitar into preDelay
@@ -1299,6 +1335,27 @@ ragaSympatheticGainRef.current = ragaSymGain;
   }, [ampGain, audioContext]);
 
   useEffect(() => {
+  if (!audioContext) return;
+
+  if (valveShaperRef.current) {
+    valveShaperRef.current.curve = makeDriveCurve((valveEnabled ? valveDrive : 0) * 8);
+  }
+
+  if (valveToneRef.current) {
+    const minF = 800;
+    const maxF = 16000;
+    const f = minF + valveTone * (maxF - minF);
+    valveToneRef.current.frequency.setTargetAtTime(f, audioContext.currentTime, 0.01);
+  }
+
+  if (valveLevelRef.current) {
+    // si está OFF, lo dejo en unity para no bajar volumen
+    const target = valveEnabled ? valveLevel : 1.0;
+    valveLevelRef.current.gain.setTargetAtTime(target, audioContext.currentTime, 0.01);
+  }
+}, [audioContext, valveEnabled, valveDrive, valveTone, valveLevel]);
+
+  useEffect(() => {
     if (!audioContext) return;
     if (toneFilterRef.current) {
       const minFreq = 200;
@@ -1583,7 +1640,14 @@ useEffect(() => {
     // Reverb
     reverbAmount,
     setReverbAmount,
-
+valveEnabled,
+setValveEnabled,
+valveDrive,
+setValveDrive,
+valveTone,
+setValveTone,
+valveLevel,
+setValveLevel,
     // Monitor
     monitorEnabled,
     setMonitorEnabled,
