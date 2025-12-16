@@ -1,6 +1,5 @@
 // src/audio/AudioEngineProvider.tsx
-import React,
-{
+import React, {
   createContext,
   useCallback,
   useContext,
@@ -121,15 +120,12 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [ampGain, setAmpGain] = useState(1.0); // 1 = unity
   const [ampTone, setAmpTone] = useState(0.5); // 0..1
   const [ampMaster, setAmpMaster] = useState(1.0);
-  
 
   // Tonestack
   const [bassAmount, setBassAmount] = useState(0.5); // 0..1
   const [midAmount, setMidAmount] = useState(0.5); // 0..1
   const [trebleAmount, setTrebleAmount] = useState(0.5); // 0..1
   const [presenceAmount, setPresenceAmount] = useState(0.5); // 0..1
-
-  
 
   // Delay bypass
   const [delayEnabled, setDelayEnabled] = useState(true);
@@ -141,6 +137,12 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [sitarAmount, setSitarAmount] = useState(0.0); // 0 = apagado
   const [sitarMode, setSitarMode] = useState<SitarMode>('exotic');
 
+  // 👇 NUEVOS ESTADOS PARA EL PEDAL RAGA
+  const [ragaEnabled, setRagaEnabled] = useState(false);
+  const [ragaResonance, setRagaResonance] = useState(0.5); // 0..1
+  const [ragaDroneLevel, setRagaDroneLevel] = useState(0.3); // 0..1
+  const [ragaColor, setRagaColor] = useState(0.5); // 0..1
+
   // Distorsión
   const [driveAmount, setDriveAmount] = useState(0.6);
   const [driveEnabled, setDriveEnabled] = useState(false);
@@ -150,32 +152,44 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
   // 🔹 Volumen del backing track (0–1)
   const [backingVolume, setBackingVolume] = useState(0.7);
-// 🔸 Progreso del preview offline (0..1)
-const [offlinePreviewProgress, setOfflinePreviewProgress] = useState(0);
 
-// Refs para la animación del cursor en el preview offline
-const offlinePreviewStartTimeRef = useRef<number | null>(null);
-const offlinePreviewAnimRef = useRef<number | null>(null);
+  // 🔸 Progreso del preview offline (0..1)
+  const [offlinePreviewProgress, setOfflinePreviewProgress] = useState(0);
+
+  // Refs para la animación del cursor en el preview offline
+  const offlinePreviewStartTimeRef = useRef<number | null>(null);
+  const offlinePreviewAnimRef = useRef<number | null>(null);
+
   // Buffer procesado offline
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
   const [processedWaveform, setProcessedWaveform] = useState<number[] | null>(null);
-   // Volumen de preview offline (0–1)
+
+  // Volumen de preview offline (0–1)
   const [offlineVolume, setOfflineVolume] = useState(1.0);
 
   // Tiempo de grabación
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingStartTimeRef = useRef<number | null>(null);
   const recordingTimerIdRef = useRef<number | null>(null);
- // Fuente para pre-escuchar el audio procesado
+
   // Fuente para pre-escuchar el audio procesado
   const offlinePreviewSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const offlinePreviewGainRef = useRef<GainNode | null>(null);
+
   const guitarStreamRef = useRef<MediaStream | null>(null);
   const guitarSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const backingSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(
+    null,
+  );
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+
+  // Raga pedal refs
+  const ragaFilterRef = useRef<BiquadFilterNode | null>(null);
+  const ragaGainRef = useRef<GainNode | null>(null);
+
+
 
   // para la animación del cursor
   const playbackStartTimeRef = useRef<number | null>(null);
@@ -350,28 +364,26 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
     setStatus('Reproduciendo audio procesado...');
   }, [processedBuffer, getOrCreateAudioContext, offlineVolume]);
 
-
- const stopProcessed = useCallback(() => {
-  if (offlinePreviewSourceRef.current) {
-    try {
-      offlinePreviewSourceRef.current.stop();
-    } catch {
-      // ignore
+  const stopProcessed = useCallback(() => {
+    if (offlinePreviewSourceRef.current) {
+      try {
+        offlinePreviewSourceRef.current.stop();
+      } catch {
+        // ignore
+      }
+      offlinePreviewSourceRef.current.disconnect();
+      offlinePreviewSourceRef.current = null;
     }
-    offlinePreviewSourceRef.current.disconnect();
-    offlinePreviewSourceRef.current = null;
-  }
 
-  if (offlinePreviewAnimRef.current != null) {
-    cancelAnimationFrame(offlinePreviewAnimRef.current);
-    offlinePreviewAnimRef.current = null;
-  }
+    if (offlinePreviewAnimRef.current != null) {
+      cancelAnimationFrame(offlinePreviewAnimRef.current);
+      offlinePreviewAnimRef.current = null;
+    }
 
-  offlinePreviewStartTimeRef.current = null;
-  setOfflinePreviewProgress(0);
-  setStatus('Reproducción detenida.');
-}, []);
-
+    offlinePreviewStartTimeRef.current = null;
+    setOfflinePreviewProgress(0);
+    setStatus('Reproducción detenida.');
+  }, []);
 
   const exportProcessed = useCallback(() => {
     if (!processedBuffer) {
@@ -475,6 +487,32 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
     toneFilter.frequency.value = minFreq + ampTone * (maxFreq - minFreq);
     toneFilterRef.current = toneFilter;
 
+    // === MASTER GAIN NODE ===
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = ampMaster * 2.0;
+    masterGainRef.current = masterGain;
+
+        // === PEDAL RAGA (sin drone: resonador nasal en paralelo) ===
+    const ragaBandpass = ctx.createBiquadFilter();
+    ragaBandpass.type = 'bandpass';
+    // valores base, después se actualizan por useEffect
+    ragaBandpass.frequency.value = 2000;
+    ragaBandpass.Q.value = 5;
+
+    const ragaGain = ctx.createGain();
+    // arranca apagado, lo prende el pedal
+    ragaGain.gain.value = 0;
+
+    // Cadena: toneFilter → ragaBandpass → ragaGain → masterGain
+    toneFilter.connect(ragaBandpass);
+    ragaBandpass.connect(ragaGain);
+    ragaGain.connect(masterGain);
+
+    // Guardar refs para el live update
+    ragaFilterRef.current = ragaBandpass;
+    ragaGainRef.current = ragaGain;
+
+
     // === SITAR SECTION ===
     const sitarDryGain = ctx.createGain();
     sitarDryGain.gain.value = 1 - sitarAmount;
@@ -535,11 +573,7 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
     feedbackGain.gain.value = feedbackAmount;
     feedbackGainRef.current = feedbackGain;
 
-    // === MASTER & REVERB ===
-    const masterGain = ctx.createGain();
-    // un poco más agresivo para que el master se sienta
-    masterGain.gain.value = ampMaster * 3.0;
-    masterGainRef.current = masterGain;
+    // === REVERB ===
 
     // Presence (post-master)
     const presenceFilter = ctx.createBiquadFilter();
@@ -561,7 +595,9 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
     const postFxGain = ctx.createGain();
     postFxGainRef.current = postFxGain;
 
-    // === CONNECTIONS ===
+    
+
+    // === CONNECTIONS PRINCIPALES ===
     // Input -> tonestack -> amp -> drive -> tone
     monoGain.connect(bassFilter);
     bassFilter.connect(midFilter);
@@ -658,7 +694,6 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
     presenceAmount,
     masterVolume,
   ]);
-
   // Entrada de guitarra
   const setupGuitarInput = useCallback(async () => {
     try {
@@ -1120,8 +1155,8 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
         }
       }
       if (offlinePreviewAnimRef.current != null) {
-  cancelAnimationFrame(offlinePreviewAnimRef.current);
-}
+        cancelAnimationFrame(offlinePreviewAnimRef.current);
+      }
       stopProgressAnimation();
       if (recordingTimerIdRef.current != null) {
         clearInterval(recordingTimerIdRef.current);
@@ -1130,7 +1165,43 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
       audioContext?.close();
     };
   }, [audioContext]);
-  
+
+
+
+  // === Live update del pedal Raga (simple y notorio) ===
+  useEffect(() => {
+    if (!audioContext) return;
+
+    const bp = ragaFilterRef.current;
+    const out = ragaGainRef.current;
+    if (!bp || !out) return;
+
+    const t = audioContext.currentTime;
+
+    // Si el pedal está OFF, no mezcla nada
+    if (!ragaEnabled) {
+      out.gain.setTargetAtTime(0, t, 0.01);
+      return;
+    }
+
+    // 1) LEVEL: cuánta señal del resonador se mezcla
+    //    (usa tu knob "DRONE" como mezcla de efecto)
+    out.gain.setTargetAtTime(ragaDroneLevel, t, 0.01);
+
+    // 2) RESONANCE: Q del band-pass
+    const minQ = 1;
+    const maxQ = 25;
+    const q = minQ + ragaResonance * (maxQ - minQ);
+    bp.Q.setTargetAtTime(q, t, 0.01);
+
+    // 3) COLOR: frecuencia central (grave → agudo)
+    const minF = 800;
+    const maxF = 5000;
+    const f = minF + ragaColor * (maxF - minF);
+    bp.frequency.setTargetAtTime(f, t, 0.01);
+  }, [audioContext, ragaEnabled, ragaDroneLevel, ragaResonance, ragaColor]);
+
+
 
   // Volumen del preview offline en vivo
   useEffect(() => {
@@ -1357,6 +1428,7 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
       jawariHighpass: jawariHighpassRef.current,
     });
   }, [sitarMode, audioContext]);
+// 🔥 Actualización en vivo del pedal Raga
 
   const value: AudioEngineContextValue = {
     status,
@@ -1381,6 +1453,7 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
     backingWaveform,
     playbackProgress,
 
+    // Delay
     delayTimeMs,
     setDelayTimeMs,
     feedbackAmount,
@@ -1388,6 +1461,7 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
     mixAmount,
     setMixAmount,
 
+    // Amp
     ampGain,
     setAmpGain,
     ampTone,
@@ -1395,6 +1469,7 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
     ampMaster,
     setAmpMaster,
 
+    // Tonestack
     bassAmount,
     setBassAmount,
     midAmount,
@@ -1404,22 +1479,37 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
     presenceAmount,
     setPresenceAmount,
 
+    // Delay bypass
     delayEnabled,
     setDelayEnabled,
 
+    // Raga pedal
+    ragaEnabled,
+    setRagaEnabled,
+    ragaResonance,
+    setRagaResonance,
+    ragaDroneLevel,
+    setRagaDroneLevel,
+    ragaColor,
+    setRagaColor,
+
+    // Sitar
     sitarAmount,
     setSitarAmount,
     sitarMode,
     setSitarMode,
 
+    // Drive
     driveAmount,
     setDriveAmount,
     driveEnabled,
     setDriveEnabled,
 
+    // Reverb
     reverbAmount,
     setReverbAmount,
 
+    // Monitor
     monitorEnabled,
     setMonitorEnabled,
 
@@ -1436,12 +1526,8 @@ const offlinePreviewAnimRef = useRef<number | null>(null);
     offlineVolume,
     setOfflineVolume,
     offlinePreviewProgress,
-    
-    
-    
 
-
-
+    // Acciones principales
     setupGuitarInput,
     loadBackingFile,
     startPlaybackAndRecording,

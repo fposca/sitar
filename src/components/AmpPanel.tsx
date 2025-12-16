@@ -14,6 +14,7 @@ import leadPanelImg from '../assets/input-lead.png';
 import infernalFrontImg from '../assets/nea-infernal.png';
 import infernalPanelImg from '../assets/input-infernal.png';
 import pedalImg from '../assets/pedal.png';
+import sitarPedalImg from '../assets/pedal-sitar.png';
 
 const labelBase: React.CSSProperties = {
   fontSize: '0.7rem',
@@ -466,6 +467,14 @@ const AmpPanel: React.FC = () => {
     setSitarAmount,
     sitarMode,
     setSitarMode,
+    ragaEnabled,
+    setRagaEnabled,
+    ragaResonance,
+    setRagaResonance,
+    ragaDroneLevel,
+    setRagaDroneLevel,
+    ragaColor,
+    setRagaColor,
     // Drive
     driveAmount,
     setDriveAmount,
@@ -543,10 +552,6 @@ const AmpPanel: React.FC = () => {
   const tabsActiveColor = skin.driveTextColor;
   const tabsInactiveColor = '#e5e7eb';
 
-  // fondo del panel de pedales: clean rosa, el resto negro
-  const pedalsBgColor =
-    skinPreset === 'cleanMystic' ? '#f4d9d5' : '#000000';
-
   const markCustom = () => setSelectedPreset('custom');
 
   return (
@@ -595,45 +600,43 @@ const AmpPanel: React.FC = () => {
           >
             Sitar Amp
           </div>
-             <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.6rem',
-          }}
-        >
           <div
             style={{
-              padding: '0.25rem 0.7rem',
-              borderRadius: '999px',
-              border: '1px solid #4b5563',
-              fontSize: '0.7rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.12em',
-              position:'relative',
-              top:'-23px',
-              left:'147px',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.4rem',
-              background: '#020617',
+              gap: '0.6rem',
             }}
           >
-            <span
+            <div
               style={{
-                width: 8,
-                height: 8,
+                padding: '0.25rem 0.7rem',
                 borderRadius: '999px',
-                background: '#22c55e',
-                boxShadow: '0 0 10px #22c55e',
+                border: '1px solid #4b5563',
+                fontSize: '0.7rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.12em',
+                position: 'relative',
+                top: '-23px',
+                left: '147px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                background: '#020617',
               }}
-            />
-            Standby
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '999px',
+                  background: '#22c55e',
+                  boxShadow: '0 0 10px #22c55e',
+                }}
+              />
+              Standby
+            </div>
           </div>
         </div>
-        </div>
-
-     
       </div>
 
       {/* Cabezál + mesa */}
@@ -1137,7 +1140,7 @@ const AmpPanel: React.FC = () => {
                 </>
               )}
 
-              {/* ---------- PANEL PEDAL DELAY ---------- */}
+              {/* ---------- PANEL PEDALES (DELAY + SITAR+) ---------- */}
               {subPanel === 'pedals' && (
                 <div
                   style={{
@@ -1145,127 +1148,281 @@ const AmpPanel: React.FC = () => {
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    backgroundColor: pedalsBgColor,
-                    gap: '0.8rem',
+                    gap: '1.6rem',
+                    backgroundColor:
+                      skin.grillBg === '#f2d8d4' ? '#f4d9d5' : '#020617',
+                    padding: '1.2rem 0 2rem',
+                    borderRadius: 18,
                   }}
                 >
+             
+
                   <div
                     style={{
-                      position: 'relative',
-                      width: 260,
-                      height: 420,
-                      backgroundImage: `url(${pedalImg})`,
-                      backgroundSize: 'contain',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'center',
                       display: 'flex',
-                      alignItems: 'flex-end',
+                      gap: '3.5rem',
                       justifyContent: 'center',
-                      paddingBottom: '1.4rem',
+                      flexWrap: 'wrap',
                     }}
                   >
+                    {/* --------- PEDAL DELAY ---------- */}
                     <div
                       style={{
                         display: 'flex',
-                        padding: '0.4rem 0.7rem',
-                        borderRadius: 999,
-                        backdropFilter: 'blur(4px)',
-                        position: 'absolute',
-                        top: '255px',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.8rem',
                       }}
                     >
-                      <Knob
-                        label="Time"
-                        min={50}
-                        max={1000}
-                        value={delayTimeMs}
-                        onChange={(v) => {
-                          setDelayTimeMs(v);
-                          markCustom();
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: 260,
+                          height: 420,
+                          backgroundImage: `url(${pedalImg})`,
+                          backgroundSize: 'contain',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'center',
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          justifyContent: 'center',
+                          paddingBottom: '1.4rem',
                         }}
-                        display={`${Math.round(delayTimeMs)} ms`}
-                        labelColor={skin.knobLabelColor}
-                        valueColor={skin.knobValueColor}
-                        faceGradient={skin.knobFaceGradient}
-                      />
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            padding: '0.4rem 0.7rem',
+                            borderRadius: 999,
+                            backdropFilter: 'blur(4px)',
+                            background: 'rgba(0,0,0,0.4)',
+                            position: 'absolute',
+                            top: '255px',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <Knob
+                            label="Time"
+                            min={50}
+                            max={1000}
+                            value={delayTimeMs}
+                            onChange={(v) => {
+                              setDelayTimeMs(v);
+                              markCustom();
+                            }}
+                            display={`${Math.round(delayTimeMs)} ms`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
 
-                      <Knob
-                        label="Feedback"
-                        min={0}
-                        max={90}
-                        value={feedbackAmount * 100}
-                        onChange={(v) => {
-                          setFeedbackAmount(v / 100);
-                          markCustom();
-                        }}
-                        display={`${Math.round(feedbackAmount * 100)}%`}
-                        labelColor={skin.knobLabelColor}
-                        valueColor={skin.knobValueColor}
-                        faceGradient={skin.knobFaceGradient}
-                      />
+                          <Knob
+                            label="Feedback"
+                            min={0}
+                            max={90}
+                            value={feedbackAmount * 100}
+                            onChange={(v) => {
+                              setFeedbackAmount(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(feedbackAmount * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
 
-                      <Knob
-                        label="Mix"
-                        min={0}
-                        max={100}
-                        value={mixAmount * 100}
-                        onChange={(v) => {
-                          setMixAmount(v / 100);
+                          <Knob
+                            label="Mix"
+                            min={0}
+                            max={100}
+                            value={mixAmount * 100}
+                            onChange={(v) => {
+                              setMixAmount(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(mixAmount * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDelayEnabled(!delayEnabled);
                           markCustom();
                         }}
-                        display={`${Math.round(mixAmount * 100)}%`}
-                        labelColor={skin.knobLabelColor}
-                        valueColor={skin.knobValueColor}
-                        faceGradient={skin.knobFaceGradient}
-                      />
+                        style={{
+                          padding: '0.55rem 1.4rem',
+                          borderRadius: '999px',
+                          border: delayEnabled
+                            ? skin.delayOnBorder
+                            : skin.delayOffBorder,
+                          background: delayEnabled
+                            ? skin.delayOnBg
+                            : skin.delayOffBg,
+                          color: delayEnabled
+                            ? skin.delayOnTextColor
+                            : skin.delayOffTextColor,
+                          fontSize: '0.7rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.16em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          cursor: 'pointer',
+                          boxShadow: delayEnabled
+                            ? skin.controlOnShadow
+                            : skin.controlOffShadow,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '999px',
+                            background: delayEnabled
+                              ? skin.delayOnDotBg
+                              : skin.delayOffDotBg,
+                          }}
+                        />
+                        {delayEnabled ? 'Delay On' : 'Delay Off'}
+                      </button>
+                    </div>
+
+                    {/* --------- PEDAL SITAR+ (RAGA) ---------- */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.8rem',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: 260,
+                          height: 420,
+                          backgroundImage: `url(${sitarPedalImg})`,
+                          backgroundSize: 'contain',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'center',
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          justifyContent: 'center',
+                          paddingBottom: '1.4rem',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            padding: '0.4rem 0.7rem',
+                            borderRadius: 999,
+                            backdropFilter: 'blur(4px)',
+                            background: 'rgba(0,0,0,0.5)',
+                            position: 'absolute',
+                            top: '255px',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <Knob
+                            label="Resonance"
+                            min={0}
+                            max={100}
+                            value={ragaResonance * 100}
+                            onChange={(v) => {
+                              setRagaResonance(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(
+                              ragaResonance * 100,
+                            )}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+
+                          <Knob
+                            label="Drone"
+                            min={0}
+                            max={100}
+                            value={ragaDroneLevel * 100}
+                            onChange={(v) => {
+                              setRagaDroneLevel(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(
+                              ragaDroneLevel * 100,
+                            )}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+
+                          <Knob
+                            label="Color"
+                            min={0}
+                            max={100}
+                            value={ragaColor * 100}
+                            onChange={(v) => {
+                              setRagaColor(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(ragaColor * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRagaEnabled(!ragaEnabled);
+                          markCustom();
+                        }}
+                        style={{
+                          padding: '0.5rem 1.4rem',
+                          borderRadius: '999px',
+                          border: ragaEnabled
+                            ? skin.delayOnBorder
+                            : skin.delayOffBorder,
+                          background: ragaEnabled
+                            ? skin.modeActiveBg
+                            : 'transparent',
+                          color: ragaEnabled
+                            ? skin.modeActiveColor
+                            : skin.modeInactiveColor,
+                          fontSize: '0.7rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.16em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          cursor: 'pointer',
+                          boxShadow: ragaEnabled
+                            ? skin.controlOnShadow
+                            : skin.controlOffShadow,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '999px',
+                            background: ragaEnabled
+                              ? skin.delayOnDotBg
+                              : skin.delayOffDotBg,
+                          }}
+                        />
+                        {ragaEnabled ? 'Raga On' : 'Raga Off'}
+                      </button>
                     </div>
                   </div>
-
-                  {/* Footswitch del delay */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDelayEnabled(!delayEnabled);
-                      markCustom();
-                    }}
-                    style={{
-                      padding: '0.55rem 1.4rem',
-                      borderRadius: '999px',
-                      border: delayEnabled
-                        ? skin.delayOnBorder
-                        : skin.delayOffBorder,
-                      background: delayEnabled
-                        ? skin.delayOnBg
-                        : skin.delayOffBg,
-                      color: delayEnabled
-                        ? skin.delayOnTextColor
-                        : skin.delayOffTextColor,
-                      fontSize: '0.7rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.16em',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.45rem',
-                      cursor: 'pointer',
-                      position: 'absolute',
-                      marginTop: '101px',
-                      boxShadow: delayEnabled
-                        ? skin.controlOnShadow
-                        : skin.controlOffShadow,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: '999px',
-                        background: delayEnabled
-                          ? skin.delayOnDotBg
-                          : skin.delayOffDotBg,
-                      }}
-                    />
-                    {delayEnabled ? 'On' : 'Off'}
-                  </button>
                 </div>
               )}
             </div>
