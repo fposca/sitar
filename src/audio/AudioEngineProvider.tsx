@@ -117,10 +117,17 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [mixAmount, setMixAmount] = useState(0.6);
 
   // ✅ Valve Crunch
-const [valveEnabled, setValveEnabled] = useState(false);
-const [valveDrive, setValveDrive] = useState(0.55); // saturación
-const [valveTone, setValveTone] = useState(0.6);    // brillo
-const [valveLevel, setValveLevel] = useState(0.9);  // volumen pedal
+  const [valveEnabled, setValveEnabled] = useState(false);
+  const [valveDrive, setValveDrive] = useState(0.55); // saturación
+  const [valveTone, setValveTone] = useState(0.6);    // brillo
+  const [valveLevel, setValveLevel] = useState(0.9);  // volumen pedal
+
+  // ✅ Flanger (Raga Sweep)
+  const [flangerEnabled, setFlangerEnabled] = useState(false);
+  const [flangerRate, setFlangerRate] = useState(0.25);      // velocidad LFO
+  const [flangerDepth, setFlangerDepth] = useState(0.55);    // profundidad mod
+  const [flangerFeedback, setFlangerFeedback] = useState(0.25); // realimentación
+  const [flangerMix, setFlangerMix] = useState(0.35);        // mezcla wet
 
 
   // Controles de ampli
@@ -166,6 +173,13 @@ const [valveLevel, setValveLevel] = useState(0.9);  // volumen pedal
   // Refs para la animación del cursor en el preview offline
   const offlinePreviewStartTimeRef = useRef<number | null>(null);
   const offlinePreviewAnimRef = useRef<number | null>(null);
+  // Flanger refs
+  const flangerDelayRef = useRef<DelayNode | null>(null);
+  const flangerFeedbackRef = useRef<GainNode | null>(null);
+  const flangerWetRef = useRef<GainNode | null>(null);
+  const flangerDryRef = useRef<GainNode | null>(null);
+  const flangerLfoRef = useRef<OscillatorNode | null>(null);
+  const flangerLfoGainRef = useRef<GainNode | null>(null);
 
   // Buffer procesado offline
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
@@ -191,17 +205,17 @@ const [valveLevel, setValveLevel] = useState(0.9);  // volumen pedal
   );
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
-const valveShaperRef = useRef<WaveShaperNode | null>(null);
-const valveToneRef = useRef<BiquadFilterNode | null>(null);
-const valveLevelRef = useRef<GainNode | null>(null);
+  const valveShaperRef = useRef<WaveShaperNode | null>(null);
+  const valveToneRef = useRef<BiquadFilterNode | null>(null);
+  const valveLevelRef = useRef<GainNode | null>(null);
 
   // Raga pedal refs
   const ragaFilterRef = useRef<BiquadFilterNode | null>(null);
   const ragaGainRef = useRef<GainNode | null>(null);
 
-// Sympathetic Strings (segundo resonador)
-const ragaSympatheticRef = useRef<BiquadFilterNode | null>(null);
-const ragaSympatheticGainRef = useRef<GainNode | null>(null);
+  // Sympathetic Strings (segundo resonador)
+  const ragaSympatheticRef = useRef<BiquadFilterNode | null>(null);
+  const ragaSympatheticGainRef = useRef<GainNode | null>(null);
 
   // para la animación del cursor
   const playbackStartTimeRef = useRef<number | null>(null);
@@ -529,35 +543,35 @@ const ragaSympatheticGainRef = useRef<GainNode | null>(null);
 
     // === SYMPATHETIC STRINGS — brillo super agudo estilo sitar ===
 
-// Filtro band-pass super agudo
-const ragaSym = ctx.createBiquadFilter();
-ragaSym.type = "bandpass";
-ragaSym.frequency.value = 7000;   // MUY agudo
-ragaSym.Q.value = 22;             // muy resonante / metálico
+    // Filtro band-pass super agudo
+    const ragaSym = ctx.createBiquadFilter();
+    ragaSym.type = "bandpass";
+    ragaSym.frequency.value = 7000;   // MUY agudo
+    ragaSym.Q.value = 22;             // muy resonante / metálico
 
-// Tiny vibrato → vibración típica del sitar real
-const ragaLFO = ctx.createOscillator();
-ragaLFO.type = "sine";
-ragaLFO.frequency.value = 4.2; // vibración lenta estilo sitar
+    // Tiny vibrato → vibración típica del sitar real
+    const ragaLFO = ctx.createOscillator();
+    ragaLFO.type = "sine";
+    ragaLFO.frequency.value = 4.2; // vibración lenta estilo sitar
 
-const ragaLFOgain = ctx.createGain();
-ragaLFOgain.gain.value = 180; // mueve la frecuencia del resonador
-ragaLFO.connect(ragaLFOgain);
-ragaLFOgain.connect(ragaSym.frequency);
-ragaLFO.start();
+    const ragaLFOgain = ctx.createGain();
+    ragaLFOgain.gain.value = 180; // mueve la frecuencia del resonador
+    ragaLFO.connect(ragaLFOgain);
+    ragaLFOgain.connect(ragaSym.frequency);
+    ragaLFO.start();
 
-// ganancia de mezcla (controlada por el pedal Raga)
-const ragaSymGain = ctx.createGain();
-ragaSymGain.gain.value = 0; // se activa solo con el pedal
+    // ganancia de mezcla (controlada por el pedal Raga)
+    const ragaSymGain = ctx.createGain();
+    ragaSymGain.gain.value = 0; // se activa solo con el pedal
 
-// Conexión en paralelo
-toneFilter.connect(ragaSym);
-ragaSym.connect(ragaSymGain);
-ragaSymGain.connect(masterGain);
+    // Conexión en paralelo
+    toneFilter.connect(ragaSym);
+    ragaSym.connect(ragaSymGain);
+    ragaSymGain.connect(masterGain);
 
-// Referencias opcionales
-ragaSympatheticRef.current = ragaSym;
-ragaSympatheticGainRef.current = ragaSymGain;
+    // Referencias opcionales
+    ragaSympatheticRef.current = ragaSym;
+    ragaSympatheticGainRef.current = ragaSymGain;
 
 
 
@@ -645,7 +659,7 @@ ragaSympatheticGainRef.current = ragaSymGain;
     const postFxGain = ctx.createGain();
     postFxGainRef.current = postFxGain;
 
-    
+
 
     // === CONNECTIONS PRINCIPALES ===
     // Input -> tonestack -> amp -> drive -> tone
@@ -657,46 +671,87 @@ ragaSympatheticGainRef.current = ragaSymGain;
     ampGainNode.connect(driveNode);
     driveNode.connect(toneFilter);
 
-// === VALVE CRUNCH (pedal aparte) ===
-const valveShaper = ctx.createWaveShaper();
-valveShaper.curve = makeDriveCurve((valveEnabled ? valveDrive : 0) * 8); // crunch
-valveShaper.oversample = '4x';
-valveShaperRef.current = valveShaper;
+    // === VALVE CRUNCH (pedal aparte) ===
+    const valveShaper = ctx.createWaveShaper();
+    valveShaper.curve = makeDriveCurve((valveEnabled ? valveDrive : 0) * 8); // crunch
+    valveShaper.oversample = '4x';
+    valveShaperRef.current = valveShaper;
 
-const valveToneFilter = ctx.createBiquadFilter();
-valveToneFilter.type = 'lowpass';
-valveToneFilter.frequency.value = 800 + valveTone * (16000 - 800);
-valveToneRef.current = valveToneFilter;
+    const valveToneFilter = ctx.createBiquadFilter();
+    valveToneFilter.type = 'lowpass';
+    valveToneFilter.frequency.value = 800 + valveTone * (16000 - 800);
+    valveToneRef.current = valveToneFilter;
 
-const valveLevelGain = ctx.createGain();
-valveLevelGain.gain.value = valveEnabled ? valveLevel : 1.0;
-valveLevelRef.current = valveLevelGain;
+    const valveLevelGain = ctx.createGain();
+    valveLevelGain.gain.value = valveEnabled ? valveLevel : 1.0;
+    valveLevelRef.current = valveLevelGain;
 
-// Re-wire: driveNode -> toneFilter -> valve -> (de ahí sale todo el resto)
-toneFilter.connect(valveShaper);
-valveShaper.connect(valveToneFilter);
-valveToneFilter.connect(valveLevelGain);
+    // Re-wire: driveNode -> toneFilter -> valve -> (de ahí sale todo el resto)
+  toneFilter.connect(valveShaper);
+  valveShaper.connect(valveToneFilter);
+    valveToneFilter.connect(valveLevelGain);
 
-// IMPORTANTE: desde ahora usá `valveLevelGain` como “punto de salida” en vez de toneFilter
-preSitarNode = valveLevelGain;
+   preSitarNode = valveLevelGain;
 
-    // Sitar paths
-    preSitarNode.connect(sitarDryGain);
+// === FLANGER (Raga Sweep) ===
+// Lo armamos acá para que afecte tanto señal dry como sitar antes del delay principal
+const flangerIn = ctx.createGain();
+flangerIn.gain.value = 1.0;
 
-    preSitarNode.connect(sitarBandpass);
-    sitarBandpass.connect(jawariDrive);
-    jawariDrive.connect(jawariDelay);
-    jawariDelay.connect(jawariFeedback);
-    jawariFeedback.connect(jawariDelay);
-    jawariDelay.connect(jawariHighpass);
-    jawariHighpass.connect(sitarWetGain);
+const flangerDelay = ctx.createDelay(0.02); // 20ms max
+flangerDelay.delayTime.value = 0.003; // base 3ms
+flangerDelayRef.current = flangerDelay;
 
-    preSitarNode.connect(sitarSympathetic);
-    sitarSympathetic.connect(sitarWetGain);
+const flangerFeedbackGain = ctx.createGain();
+flangerFeedbackGain.gain.value = 0.0;
+flangerFeedbackRef.current = flangerFeedbackGain;
 
-    // Mix dry + sitar into preDelay
-    sitarDryGain.connect(preDelayGain);
-    sitarWetGain.connect(preDelayGain);
+const flangerDry = ctx.createGain();
+flangerDry.gain.value = 1.0;
+flangerDryRef.current = flangerDry;
+
+const flangerWet = ctx.createGain();
+flangerWet.gain.value = 0.0;
+flangerWetRef.current = flangerWet;
+
+// feedback loop
+flangerDelay.connect(flangerFeedbackGain);
+flangerFeedbackGain.connect(flangerDelay);
+// LFO modula delayTime
+const flangerLFO = ctx.createOscillator();
+flangerLFO.type = 'sine';
+flangerLFO.frequency.value = 0.3; // se actualiza por useEffect
+flangerLfoRef.current = flangerLFO;
+
+const flangerLFOGain = ctx.createGain();
+flangerLFOGain.gain.value = 0.0; // profundidad (segundos) por useEffect
+flangerLfoGainRef.current = flangerLFOGain;
+
+flangerLFO.connect(flangerLFOGain);
+flangerLFOGain.connect(flangerDelay.delayTime);
+flangerLFO.start();
+
+// routing flanger: in -> dry + delay -> wet -> out
+const flangerOut = ctx.createGain();
+flangerOut.gain.value = 1.0;
+flangerIn.connect(flangerDry);
+flangerIn.connect(flangerDelay);
+flangerDelay.connect(flangerWet);
+
+flangerDry.connect(flangerOut);
+flangerWet.connect(flangerOut);
+
+// Conectar preSitar al flangerIn
+preSitarNode.connect(flangerIn);
+
+// Desde ahora, todo lo que antes iba a preDelayGain, sale de flangerOut
+const preDelayInput = flangerOut;
+
+// Sitar paths
+preDelayInput.connect(sitarDryGain);
+// Mix dry + sitar into preDelay (ahora entra por preDelayGain)
+sitarDryGain.connect(preDelayGain);
+sitarWetGain.connect(preDelayGain);
 
     // Delay network
     preDelayGain.connect(dryGain);
@@ -1037,6 +1092,44 @@ preSitarNode = valveLevelGain;
     }
   }, [audioContext]);
 
+useEffect(() => {
+  if (!audioContext) return;
+
+  const d = flangerDelayRef.current;
+  const fb = flangerFeedbackRef.current;
+  const wet = flangerWetRef.current;
+  const dry = flangerDryRef.current;
+  const lfo = flangerLfoRef.current;
+  const lfoGain = flangerLfoGainRef.current;
+  if (!d || !fb || !wet || !dry || !lfo || !lfoGain) return;
+
+  const t = audioContext.currentTime;
+
+  // Base delay (ms)
+  const baseMs = 2.5;
+  d.delayTime.setTargetAtTime(baseMs / 1000, t, 0.01);
+
+  // Rate: 0..1 -> 0.05..1.2 Hz (lento/místico)
+  const minHz = 0.05;
+  const maxHz = 1.2;
+  const hz = minHz + flangerRate * (maxHz - minHz);
+  lfo.frequency.setTargetAtTime(hz, t, 0.01);
+
+  // Depth: 0..1 -> 0..4ms (en segundos)
+  const depthMs = 4.0 * flangerDepth;
+  lfoGain.gain.setTargetAtTime(depthMs / 1000, t, 0.01);
+
+  // Mix
+  const mix = flangerEnabled ? flangerMix : 0;
+  wet.gain.setTargetAtTime(mix, t, 0.01);
+  dry.gain.setTargetAtTime(1 - mix, t, 0.01);
+
+  // Feedback
+  const fbAmt = flangerEnabled ? flangerFeedback * 0.85 : 0;
+  fb.gain.setTargetAtTime(fbAmt, t, 0.01);
+}, [audioContext, flangerEnabled, flangerRate, flangerDepth, flangerFeedback, flangerMix]);
+
+
   // loop del cursor
   const startProgressAnimation = useCallback(() => {
     if (!audioContext || !backingBuffer) return;
@@ -1335,25 +1428,25 @@ preSitarNode = valveLevelGain;
   }, [ampGain, audioContext]);
 
   useEffect(() => {
-  if (!audioContext) return;
+    if (!audioContext) return;
 
-  if (valveShaperRef.current) {
-    valveShaperRef.current.curve = makeDriveCurve((valveEnabled ? valveDrive : 0) * 8);
-  }
+    if (valveShaperRef.current) {
+      valveShaperRef.current.curve = makeDriveCurve((valveEnabled ? valveDrive : 0) * 8);
+    }
 
-  if (valveToneRef.current) {
-    const minF = 800;
-    const maxF = 16000;
-    const f = minF + valveTone * (maxF - minF);
-    valveToneRef.current.frequency.setTargetAtTime(f, audioContext.currentTime, 0.01);
-  }
+    if (valveToneRef.current) {
+      const minF = 800;
+      const maxF = 16000;
+      const f = minF + valveTone * (maxF - minF);
+      valveToneRef.current.frequency.setTargetAtTime(f, audioContext.currentTime, 0.01);
+    }
 
-  if (valveLevelRef.current) {
-    // si está OFF, lo dejo en unity para no bajar volumen
-    const target = valveEnabled ? valveLevel : 1.0;
-    valveLevelRef.current.gain.setTargetAtTime(target, audioContext.currentTime, 0.01);
-  }
-}, [audioContext, valveEnabled, valveDrive, valveTone, valveLevel]);
+    if (valveLevelRef.current) {
+      // si está OFF, lo dejo en unity para no bajar volumen
+      const target = valveEnabled ? valveLevel : 1.0;
+      valveLevelRef.current.gain.setTargetAtTime(target, audioContext.currentTime, 0.01);
+    }
+  }, [audioContext, valveEnabled, valveDrive, valveTone, valveLevel]);
 
   useEffect(() => {
     if (!audioContext) return;
@@ -1368,44 +1461,44 @@ preSitarNode = valveLevelGain;
       );
     }
   }, [ampTone, audioContext]);
-// === Live update de Sympathetic Strings según el pedal ===
-useEffect(() => {
-  if (!audioContext) return;
-  if (!ragaSympatheticGainRef.current || !ragaSympatheticRef.current) return;
+  // === Live update de Sympathetic Strings según el pedal ===
+  useEffect(() => {
+    if (!audioContext) return;
+    if (!ragaSympatheticGainRef.current || !ragaSympatheticRef.current) return;
 
-  const t = audioContext.currentTime;
+    const t = audioContext.currentTime;
 
-  // Si el pedal está apagado, cero mezcla
-  if (!ragaEnabled) {
-    ragaSympatheticGainRef.current.gain.setTargetAtTime(0, t, 0.01);
-    return;
-  }
+    // Si el pedal está apagado, cero mezcla
+    if (!ragaEnabled) {
+      ragaSympatheticGainRef.current.gain.setTargetAtTime(0, t, 0.01);
+      return;
+    }
 
-  // Mezcla proporcional al knob DRONE/LEVEL
-  ragaSympatheticGainRef.current.gain.setTargetAtTime(
-    ragaDroneLevel * 0.9,
-    t,
-    0.01
-  );
+    // Mezcla proporcional al knob DRONE/LEVEL
+    ragaSympatheticGainRef.current.gain.setTargetAtTime(
+      ragaDroneLevel * 0.9,
+      t,
+      0.01
+    );
 
-  // Resonancia controlada por el knob RESONANCE
-  const minQ = 10;
-  const maxQ = 25;
-  ragaSympatheticRef.current.Q.setTargetAtTime(
-    minQ + (maxQ - minQ) * ragaResonance,
-    t,
-    0.01
-  );
+    // Resonancia controlada por el knob RESONANCE
+    const minQ = 10;
+    const maxQ = 25;
+    ragaSympatheticRef.current.Q.setTargetAtTime(
+      minQ + (maxQ - minQ) * ragaResonance,
+      t,
+      0.01
+    );
 
-  // Color combina el rango
-  const minF = 5500;
-  const maxF = 9000;
-  ragaSympatheticRef.current.frequency.setTargetAtTime(
-    minF + ragaColor * (maxF - minF),
-    t,
-    0.01
-  );
-}, [audioContext, ragaEnabled, ragaDroneLevel, ragaResonance, ragaColor]);
+    // Color combina el rango
+    const minF = 5500;
+    const maxF = 9000;
+    ragaSympatheticRef.current.frequency.setTargetAtTime(
+      minF + ragaColor * (maxF - minF),
+      t,
+      0.01
+    );
+  }, [audioContext, ragaEnabled, ragaDroneLevel, ragaResonance, ragaColor]);
 
   useEffect(() => {
     if (!audioContext) return;
@@ -1560,7 +1653,7 @@ useEffect(() => {
       jawariHighpass: jawariHighpassRef.current,
     });
   }, [sitarMode, audioContext]);
-// 🔥 Actualización en vivo del pedal Raga
+  // 🔥 Actualización en vivo del pedal Raga
 
   const value: AudioEngineContextValue = {
     status,
@@ -1584,7 +1677,17 @@ useEffect(() => {
     backingName,
     backingWaveform,
     playbackProgress,
-
+// Flanger
+    flangerEnabled,
+    setFlangerEnabled,
+    flangerRate,
+    setFlangerRate,
+    flangerDepth,
+    setFlangerDepth,
+    flangerFeedback,
+    setFlangerFeedback,
+    flangerMix,
+    setFlangerMix,
     // Delay
     delayTimeMs,
     setDelayTimeMs,
@@ -1640,14 +1743,14 @@ useEffect(() => {
     // Reverb
     reverbAmount,
     setReverbAmount,
-valveEnabled,
-setValveEnabled,
-valveDrive,
-setValveDrive,
-valveTone,
-setValveTone,
-valveLevel,
-setValveLevel,
+    valveEnabled,
+    setValveEnabled,
+    valveDrive,
+    setValveDrive,
+    valveTone,
+    setValveTone,
+    valveLevel,
+    setValveLevel,
     // Monitor
     monitorEnabled,
     setMonitorEnabled,

@@ -16,6 +16,9 @@ import infernalPanelImg from '../assets/input-infernal.png';
 import pedalImg from '../assets/pedal.png';
 import distoPedalImg from '../assets/disto.png';
 import sitarPedalImg from '../assets/pedal-sitar.png';
+import flangerPedal from '../assets/flanger.png';
+
+
 
 const labelBase: React.CSSProperties = {
   fontSize: '0.7rem',
@@ -507,6 +510,15 @@ const AmpPanel: React.FC = () => {
     setTrebleAmount,
     presenceAmount,
     setPresenceAmount,
+     // ✅ Flanger
+    flangerEnabled,
+    setFlangerEnabled,
+    flangerRate,
+    setFlangerRate,
+    flangerDepth,
+    setFlangerDepth,
+    flangerMix,
+    setFlangerMix,
   } = useAudioEngine();
 
   const [selectedPreset, setSelectedPreset] = useState<PresetId | 'custom'>(
@@ -1303,6 +1315,122 @@ const AmpPanel: React.FC = () => {
                         {delayEnabled ? 'Delay On' : 'Delay Off'}
                       </button>
                     </div>
+                     {/* --------- PEDAL FLANGER (RAGA SWEEP) ---------- */}
+  <div
+    style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: '0.8rem',
+    }}
+  >
+    <div
+      style={{
+        position: 'relative',
+        width: 260,
+        height: 420,
+        backgroundImage: `url(${flangerPedal})`,
+        backgroundSize: 'contain',
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center',
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+        paddingBottom: '1.4rem',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          padding: '0.4rem 0.7rem',
+          borderRadius: 999,
+          backdropFilter: 'blur(4px)',
+          background: 'rgba(0,0,0,0.45)',
+          position: 'absolute',
+          top: '255px',
+          gap: '0.5rem',
+        }}
+      >
+        <Knob
+          label="Rate"
+          min={0}
+          max={100}
+          value={flangerRate * 100}
+          onChange={(v) => {
+            setFlangerRate(v / 100);
+            markCustom();
+          }}
+          display={`${Math.round(flangerRate * 100)}%`}
+          labelColor="#f9fafb"
+          valueColor="#e5e7eb"
+          faceGradient={skin.knobFaceGradient}
+        />
+
+        <Knob
+          label="Depth"
+          min={0}
+          max={100}
+          value={flangerDepth * 100}
+          onChange={(v) => {
+            setFlangerDepth(v / 100);
+            markCustom();
+          }}
+          display={`${Math.round(flangerDepth * 100)}%`}
+          labelColor="#f9fafb"
+          valueColor="#e5e7eb"
+          faceGradient={skin.knobFaceGradient}
+        />
+
+        <Knob
+          label="Mix"
+          min={0}
+          max={100}
+          value={flangerMix * 100}
+          onChange={(v) => {
+            setFlangerMix(v / 100);
+            markCustom();
+          }}
+          display={`${Math.round(flangerMix * 100)}%`}
+          labelColor="#f9fafb"
+          valueColor="#e5e7eb"
+          faceGradient={skin.knobFaceGradient}
+        />
+      </div>
+    </div>
+
+    <button
+      type="button"
+      onClick={() => {
+        setFlangerEnabled(!flangerEnabled);
+        markCustom();
+      }}
+      style={{
+        padding: '0.5rem 1.4rem',
+        borderRadius: '999px',
+        border: flangerEnabled ? skin.delayOnBorder : skin.delayOffBorder,
+        background: flangerEnabled ? skin.modeActiveBg : 'transparent',
+        color: flangerEnabled ? skin.modeActiveColor : skin.modeInactiveColor,
+        fontSize: '0.7rem',
+        textTransform: 'uppercase',
+        letterSpacing: '0.16em',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.45rem',
+        cursor: 'pointer',
+        boxShadow: flangerEnabled ? skin.controlOnShadow : skin.controlOffShadow,
+      }}
+    >
+      <span
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: '999px',
+          background: flangerEnabled ? skin.delayOnDotBg : skin.delayOffDotBg,
+        }}
+      />
+      {flangerEnabled ? 'Flanger On' : 'Flanger Off'}
+    </button>
+  </div>
                     {/* --------- PEDAL DISTO+ (VALVE CRUNCH) ---------- */}
                     <div
                       style={{

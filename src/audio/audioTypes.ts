@@ -118,6 +118,19 @@ setValveTone: (v: number) => void;
 valveLevel: number; // 0..1
 setValveLevel: (v: number) => void;
 
+
+
+  // ✅ Flanger (Raga Sweep)
+  flangerEnabled: boolean;
+  setFlangerEnabled: (v: boolean) => void;
+  flangerRate: number;
+  setFlangerRate: (v: number) => void;
+  flangerDepth: number;
+  setFlangerDepth: (v: number) => void;
+  flangerFeedback: number;
+  setFlangerFeedback: (v: number) => void;
+  flangerMix: number;
+  setFlangerMix: (v: number) => void;
   // Acciones
   setupGuitarInput: () => Promise<void>;
   loadBackingFile: (file: File) => Promise<void>;
