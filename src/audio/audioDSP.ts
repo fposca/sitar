@@ -23,58 +23,66 @@ export const applySitarMode = (
     jawariHighpass: BiquadFilterNode;
   },
 ) => {
+  // Helper: evita clicks al cambiar de modo (si lo llamás en vivo)
+  const now = nodes.sitarBandpass.context.currentTime;
+  const smooth = (p: AudioParam, v: number) => p.setTargetAtTime(v, now, 0.01);
+
   switch (mode) {
     case 'sharp': {
-      // cuasi eléctrico, ultra brillante
-      nodes.sitarBandpass.frequency.value = 5000;
-      nodes.sitarBandpass.Q.value = 10;
+      // Ultra brillante, “eléctrico”, jawari mordiente
+      smooth(nodes.sitarBandpass.frequency, 5200);
+      smooth(nodes.sitarBandpass.Q, 18);
 
-      nodes.sitarSympathetic.frequency.value = 7800;
-      nodes.sitarSympathetic.Q.value = 18;
+      smooth(nodes.sitarSympathetic.frequency, 8400);
+      smooth(nodes.sitarSympathetic.Q, 26);
 
-      nodes.jawariHighpass.frequency.value = 2600;
-      nodes.jawariDrive.curve = makeDriveCurve(5.0);
+      smooth(nodes.jawariHighpass.frequency, 3400);
+      nodes.jawariDrive.curve = makeDriveCurve(9.0);
       break;
     }
+
     case 'major': {
-      // abierto, acústico, menos nasal
-      nodes.sitarBandpass.frequency.value = 3200;
-      nodes.sitarBandpass.Q.value = 4;
+      // Abierto/acústico: menos nasal, más “cuerpo” y menos chicharra
+      smooth(nodes.sitarBandpass.frequency, 2600);
+      smooth(nodes.sitarBandpass.Q, 6);
 
-      nodes.sitarSympathetic.frequency.value = 5200;
-      nodes.sitarSympathetic.Q.value = 6;
+      smooth(nodes.sitarSympathetic.frequency, 6100);
+      smooth(nodes.sitarSympathetic.Q, 12);
 
-      nodes.jawariHighpass.frequency.value = 1800;
-      nodes.jawariDrive.curve = makeDriveCurve(3.2);
+      smooth(nodes.jawariHighpass.frequency, 2100);
+      nodes.jawariDrive.curve = makeDriveCurve(5.5);
       break;
     }
+
     case 'minor': {
-      // oscuro, fúnebre, rollo “lamento indio”
-      nodes.sitarBandpass.frequency.value = 2400;
-      nodes.sitarBandpass.Q.value = 7;
+      // Oscuro/quejoso: resonancia más baja y más “nasal”
+      smooth(nodes.sitarBandpass.frequency, 1850);
+      smooth(nodes.sitarBandpass.Q, 12);
 
-      nodes.sitarSympathetic.frequency.value = 4000;
-      nodes.sitarSympathetic.Q.value = 10;
+      smooth(nodes.sitarSympathetic.frequency, 4300);
+      smooth(nodes.sitarSympathetic.Q, 18);
 
-      nodes.jawariHighpass.frequency.value = 900;
-      nodes.jawariDrive.curve = makeDriveCurve(2.5);
+      smooth(nodes.jawariHighpass.frequency, 1500);
+      nodes.jawariDrive.curve = makeDriveCurve(6.5);
       break;
     }
+
     case 'exotic':
     default: {
-      // loco, exagerado, muy “India profunda”
-      nodes.sitarBandpass.frequency.value = 4200;
-      nodes.sitarBandpass.Q.value = 14;
+      // Muy India profunda: súper resonante + chispa fuerte arriba
+      smooth(nodes.sitarBandpass.frequency, 3600);
+      smooth(nodes.sitarBandpass.Q, 24);
 
-      nodes.sitarSympathetic.frequency.value = 9500;
-      nodes.sitarSympathetic.Q.value = 20;
+      smooth(nodes.sitarSympathetic.frequency, 9200);
+      smooth(nodes.sitarSympathetic.Q, 30);
 
-      nodes.jawariHighpass.frequency.value = 3000;
-      nodes.jawariDrive.curve = makeDriveCurve(7.0);
+      smooth(nodes.jawariHighpass.frequency, 3800);
+      nodes.jawariDrive.curve = makeDriveCurve(11.0);
       break;
     }
   }
 };
+
 
 // Calcula forma de onda liviana para el backing
 export const computeWaveform = (buffer: AudioBuffer): number[] => {

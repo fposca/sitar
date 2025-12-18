@@ -594,7 +594,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     sitarSympatheticRef.current = sitarSympathetic;
 
     const jawariDrive = ctx.createWaveShaper();
-    jawariDrive.curve = makeDriveCurve(4.0);
+    jawariDrive.curve = makeDriveCurve(6.0);
     jawariDrive.oversample = '4x';
     jawariDriveRef.current = jawariDrive;
 
@@ -602,7 +602,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     jawariDelay.delayTime.value = 0.0015;
 
     const jawariFeedback = ctx.createGain();
-    jawariFeedback.gain.value = 0.35;
+    jawariFeedback.gain.value = 0.65;
 
     const jawariHighpass = ctx.createBiquadFilter();
     jawariHighpass.type = 'highpass';
@@ -670,6 +670,69 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
     ampGainNode.connect(driveNode);
     driveNode.connect(toneFilter);
+    // ======================================================
+// 🌺 RESIDUAL DRONE ENGINE (alma del sitar)
+// ======================================================
+
+// 1) Fuente de ruido constante (muy bajo nivel)
+const droneNoiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+const noiseData = droneNoiseBuffer.getChannelData(0);
+for (let i = 0; i < noiseData.length; i++) {
+  noiseData[i] = (Math.random() * 2 - 1) * 0.15;
+}
+
+const droneNoise = ctx.createBufferSource();
+droneNoise.buffer = droneNoiseBuffer;
+droneNoise.loop = true;
+
+// 2) Filtro resonante (cuerdas simpáticas)
+const droneFilter = ctx.createBiquadFilter();
+droneFilter.type = 'bandpass';
+droneFilter.frequency.value = 2200; // rango sitar
+droneFilter.Q.value = 28;           // MUY resonante
+// 2.5) Ganancia del drone (nivel base + envelope)
+const droneGain = ctx.createGain();
+droneGain.gain.value = 0.0; // arranca cerrado, lo abre el envelope
+
+// 3) Envelope follower REAL (rectificador + lowpass)
+
+// Rectificador full-wave (abs)
+const droneRectifier = ctx.createWaveShaper();
+droneRectifier.curve = (() => {
+  const n = 2048;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = Math.abs(x);
+  }
+  return curve;
+})();
+droneRectifier.oversample = "4x";
+
+// Lowpass para suavizar la envolvente (respira lento)
+const droneEnvLP = ctx.createBiquadFilter();
+droneEnvLP.type = "lowpass";
+droneEnvLP.frequency.value = 8; // MÁS lento = más cola
+
+// Excitación desde la guitarra
+toneFilter.connect(droneRectifier);
+droneRectifier.connect(droneEnvLP);
+const droneEnvAmount = ctx.createGain();
+droneEnvAmount.gain.value = 0.25; // 0.15–0.45 según gusto
+
+droneEnvLP.connect(droneEnvAmount);
+droneEnvAmount.connect(droneGain.gain);
+// Controla la ganancia del drone
+
+
+// Camino del drone
+droneNoise.connect(droneFilter);
+droneFilter.connect(droneGain);
+droneGain.connect(masterGain);
+
+// Arrancar ruido
+droneNoise.start();
+
 
     // === VALVE CRUNCH (pedal aparte) ===
     const valveShaper = ctx.createWaveShaper();
@@ -746,6 +809,20 @@ preSitarNode.connect(flangerIn);
 
 // Desde ahora, todo lo que antes iba a preDelayGain, sale de flangerOut
 const preDelayInput = flangerOut;
+// ✅ CONEXIONES SITAR (LIVE) — acá SÍ existe preDelayInput
+
+// Alimentar el camino WET (jawari + resonancias)
+preDelayInput.connect(sitarBandpass);
+sitarBandpass.connect(jawariDrive);
+jawariDrive.connect(jawariDelay);
+jawariDelay.connect(jawariFeedback);
+jawariFeedback.connect(jawariDelay);
+jawariDelay.connect(jawariHighpass);
+jawariHighpass.connect(sitarWetGain);
+
+// Sympathetic en paralelo (entra también al wet)
+preDelayInput.connect(sitarSympathetic);
+sitarSympathetic.connect(sitarWetGain);
 
 // Sitar paths
 preDelayInput.connect(sitarDryGain);
@@ -927,7 +1004,7 @@ sitarWetGain.connect(preDelayGain);
         jawariDrive.oversample = '4x';
 
         const jawariDelay = offlineCtx.createDelay(0.02);
-        jawariDelay.delayTime.value = 0.0015;
+        jawariDelay.delayTime.value =  0.0009;
 
         const jawariFeedback = offlineCtx.createGain();
         jawariFeedback.gain.value = 0.35;
@@ -1688,6 +1765,7 @@ useEffect(() => {
     setFlangerFeedback,
     flangerMix,
     setFlangerMix,
+    
     // Delay
     delayTimeMs,
     setDelayTimeMs,
