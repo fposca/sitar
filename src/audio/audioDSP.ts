@@ -2,16 +2,45 @@
 import type { SitarMode } from './audioTypes';
 
 // helper simple para saturación tipo drive
-export const makeDriveCurve = (amount: number) => {
-  const k = amount;
-  const n = 256;
+// amount esperado: 0..1
+export function makeDriveCurve(
+  mode: 'overdrive' | 'crunch' | 'distortion',
+  amount: number,
+) {
+  const n = 2048;
   const curve = new Float32Array(n);
+
+  const a = Math.max(0, Math.min(1, amount));
+
   for (let i = 0; i < n; i++) {
-    const x = (i * 2) / n - 1;
-    curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+    const x = (i / (n - 1)) * 2 - 1;
+
+    const k =
+      mode === 'overdrive' ? 2 + a * 8 :
+      mode === 'crunch' ? 4 + a * 14 :
+      8 + a * 30;
+
+    let y = x;
+
+    if (mode === 'overdrive') {
+      // soft clip
+      y = Math.tanh(k * x);
+    } else if (mode === 'crunch') {
+      // más mordida pero todavía musical
+      y = (2 / Math.PI) * Math.atan(k * x);
+    } else {
+      // distortion: hard-ish clip
+      const t = 0.6 - a * 0.35; // threshold
+      const tt = Math.max(0.05, t);
+      y = Math.max(-tt, Math.min(tt, x));
+      y = y / tt; // normalize
+    }
+
+    curve[i] = y;
   }
+
   return curve;
-};
+}
 
 // Ajusta la respuesta “india” según el modo elegido
 export const applySitarMode = (
@@ -23,13 +52,11 @@ export const applySitarMode = (
     jawariHighpass: BiquadFilterNode;
   },
 ) => {
-  // Helper: evita clicks al cambiar de modo (si lo llamás en vivo)
   const now = nodes.sitarBandpass.context.currentTime;
   const smooth = (p: AudioParam, v: number) => p.setTargetAtTime(v, now, 0.01);
 
   switch (mode) {
     case 'sharp': {
-      // Ultra brillante, “eléctrico”, jawari mordiente
       smooth(nodes.sitarBandpass.frequency, 5200);
       smooth(nodes.sitarBandpass.Q, 18);
 
@@ -37,12 +64,13 @@ export const applySitarMode = (
       smooth(nodes.sitarSympathetic.Q, 26);
 
       smooth(nodes.jawariHighpass.frequency, 3400);
-      nodes.jawariDrive.curve = makeDriveCurve(9.0);
+
+      // más agresivo/brillante
+      nodes.jawariDrive.curve = makeDriveCurve('distortion', 0.75);
       break;
     }
 
     case 'major': {
-      // Abierto/acústico: menos nasal, más “cuerpo” y menos chicharra
       smooth(nodes.sitarBandpass.frequency, 2600);
       smooth(nodes.sitarBandpass.Q, 6);
 
@@ -50,12 +78,13 @@ export const applySitarMode = (
       smooth(nodes.sitarSympathetic.Q, 12);
 
       smooth(nodes.jawariHighpass.frequency, 2100);
-      nodes.jawariDrive.curve = makeDriveCurve(5.5);
+
+      // más musical
+      nodes.jawariDrive.curve = makeDriveCurve('crunch', 0.40);
       break;
     }
 
     case 'minor': {
-      // Oscuro/quejoso: resonancia más baja y más “nasal”
       smooth(nodes.sitarBandpass.frequency, 1850);
       smooth(nodes.sitarBandpass.Q, 12);
 
@@ -63,13 +92,13 @@ export const applySitarMode = (
       smooth(nodes.sitarSympathetic.Q, 18);
 
       smooth(nodes.jawariHighpass.frequency, 1500);
-      nodes.jawariDrive.curve = makeDriveCurve(6.5);
+
+      nodes.jawariDrive.curve = makeDriveCurve('crunch', 0.50);
       break;
     }
 
     case 'exotic':
     default: {
-      // Muy India profunda: súper resonante + chispa fuerte arriba
       smooth(nodes.sitarBandpass.frequency, 3600);
       smooth(nodes.sitarBandpass.Q, 24);
 
@@ -77,12 +106,12 @@ export const applySitarMode = (
       smooth(nodes.sitarSympathetic.Q, 30);
 
       smooth(nodes.jawariHighpass.frequency, 3800);
-      nodes.jawariDrive.curve = makeDriveCurve(11.0);
+
+      nodes.jawariDrive.curve = makeDriveCurve('distortion', 0.90);
       break;
     }
   }
 };
-
 
 // Calcula forma de onda liviana para el backing
 export const computeWaveform = (buffer: AudioBuffer): number[] => {

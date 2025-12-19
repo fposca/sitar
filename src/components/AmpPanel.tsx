@@ -54,7 +54,7 @@ const Knob: React.FC<KnobProps> = ({
   labelColor,
   valueColor,
   faceGradient,
-  
+
 }) => {
   const percent = (value - min) / (max - min);
 
@@ -138,7 +138,7 @@ type PresetSettings = {
   reverbAmount: number;
   sitarAmount: number;
   sitarMode: SitarMode;
-  
+
 };
 
 const PRESETS: Record<
@@ -453,11 +453,12 @@ type SubPanel = 'amp' | 'pedals';
 const AmpPanel: React.FC = () => {
   const {
     // Amp
+
     // ✅ Octave
     octaveTone,
-setOctaveTone,
-octaveLevel,
-setOctaveLevel,
+    setOctaveTone,
+    octaveLevel,
+    setOctaveLevel,
     octaveEnabled,
     setOctaveEnabled,
     octaveMix,
@@ -477,15 +478,15 @@ setOctaveLevel,
     setFeedbackAmount,
     mixAmount,
     setMixAmount,
-     // 🔥 VALVE DISTO (ACÁ VA ESTO)
-  valveEnabled,
-  setValveEnabled,
-  valveDrive,
-  setValveDrive,
-  valveTone,
-  setValveTone,
-  valveLevel,
-  setValveLevel,
+    // 🔥 VALVE DISTO (ACÁ VA ESTO)
+    valveEnabled,
+    setValveEnabled,
+    valveDrive,
+    setValveDrive,
+    valveTone,
+    setValveTone,
+    valveLevel,
+    setValveLevel,
     // Sitar
     sitarAmount,
     setSitarAmount,
@@ -519,7 +520,7 @@ setOctaveLevel,
     setTrebleAmount,
     presenceAmount,
     setPresenceAmount,
-     // ✅ Flanger
+    // ✅ Flanger
     flangerEnabled,
     setFlangerEnabled,
     flangerRate,
@@ -528,20 +529,27 @@ setOctaveLevel,
     setFlangerDepth,
     flangerMix,
     setFlangerMix,
+    setValveMode,
+    valveMode,
+
+
+
+
+
 
     // ✅ PHASER
-phaserEnabled,
-setPhaserEnabled,
-phaserRate,
-setPhaserRate,
-phaserDepth,
-setPhaserDepth,
-phaserFeedback,
-setPhaserFeedback,
-phaserMix,
-setPhaserMix,
-phaserCenter,
-setPhaserCenter,
+    phaserEnabled,
+    setPhaserEnabled,
+    phaserRate,
+    setPhaserRate,
+    phaserDepth,
+    setPhaserDepth,
+    phaserFeedback,
+    setPhaserFeedback,
+    phaserMix,
+    setPhaserMix,
+    phaserCenter,
+    setPhaserCenter,
   } = useAudioEngine();
 
   const [selectedPreset, setSelectedPreset] = useState<PresetId | 'custom'>(
@@ -1339,388 +1347,388 @@ setPhaserCenter,
                       </button>
                     </div>
 
-{/* ✅ PHASER */}
-<div
-  style={{
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '0.8rem',
-  }}
->
-  <div
-    style={{
-      position: 'relative',
-      width: 260,
-      height: 420,
-      backgroundImage: `url(${pedalImg})`,
-      backgroundSize: 'contain',
-      backgroundRepeat: 'no-repeat',
-      backgroundPosition: 'center',
-      display: 'flex',
-      alignItems: 'flex-end',
-      justifyContent: 'center',
-      paddingBottom: '1.4rem',
-    }}
-  >
-    <div
-      style={{
-        display: 'flex',
-        padding: '0.4rem 0.7rem',
-        borderRadius: 999,
-        backdropFilter: 'blur(4px)',
-        background: 'rgba(0,0,0,0.45)',
-        position: 'absolute',
-        top: '255px',
-        gap: '0.5rem',
-      }}
-    >
-      <Knob
-        label="Rate"
-        min={0}
-        max={100}
-        value={phaserRate * 100}
-        onChange={(v) => {
-          setPhaserRate(v / 100);
-          markCustom();
-        }}
-        display={`${Math.round(phaserRate * 100)}%`}
-        labelColor="#f9fafb"
-        valueColor="#e5e7eb"
-        faceGradient={skin.knobFaceGradient}
-      />
+                    {/* ✅ PHASER */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.8rem',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: 260,
+                          height: 420,
+                          backgroundImage: `url(${pedalImg})`,
+                          backgroundSize: 'contain',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'center',
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          justifyContent: 'center',
+                          paddingBottom: '1.4rem',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            padding: '0.4rem 0.7rem',
+                            borderRadius: 999,
+                            backdropFilter: 'blur(4px)',
+                            background: 'rgba(0,0,0,0.45)',
+                            position: 'absolute',
+                            top: '255px',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <Knob
+                            label="Rate"
+                            min={0}
+                            max={100}
+                            value={phaserRate * 100}
+                            onChange={(v) => {
+                              setPhaserRate(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(phaserRate * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
 
-      <Knob
-        label="Depth"
-        min={0}
-        max={100}
-        value={phaserDepth * 100}
-        onChange={(v) => {
-          setPhaserDepth(v / 100);
-          markCustom();
-        }}
-        display={`${Math.round(phaserDepth * 100)}%`}
-        labelColor="#f9fafb"
-        valueColor="#e5e7eb"
-        faceGradient={skin.knobFaceGradient}
-      />
+                          <Knob
+                            label="Depth"
+                            min={0}
+                            max={100}
+                            value={phaserDepth * 100}
+                            onChange={(v) => {
+                              setPhaserDepth(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(phaserDepth * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
 
-      <Knob
-        label="FB"
-        min={0}
-        max={100}
-        value={phaserFeedback * 100}
-        onChange={(v) => {
-          setPhaserFeedback(v / 100);
-          markCustom();
-        }}
-        display={`${Math.round(phaserFeedback * 100)}%`}
-        labelColor="#f9fafb"
-        valueColor="#e5e7eb"
-        faceGradient={skin.knobFaceGradient}
-      />
+                          <Knob
+                            label="FB"
+                            min={0}
+                            max={100}
+                            value={phaserFeedback * 100}
+                            onChange={(v) => {
+                              setPhaserFeedback(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(phaserFeedback * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
 
-      <Knob
-        label="Mix"
-        min={0}
-        max={100}
-        value={phaserMix * 100}
-        onChange={(v) => {
-          setPhaserMix(v / 100);
-          markCustom();
-        }}
-        display={`${Math.round(phaserMix * 100)}%`}
-        labelColor="#f9fafb"
-        valueColor="#e5e7eb"
-        faceGradient={skin.knobFaceGradient}
-      />
+                          <Knob
+                            label="Mix"
+                            min={0}
+                            max={100}
+                            value={phaserMix * 100}
+                            onChange={(v) => {
+                              setPhaserMix(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(phaserMix * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
 
-      <Knob
-        label="Center"
-        min={0}
-        max={100}
-        value={phaserCenter * 100}
-        onChange={(v) => {
-          setPhaserCenter(v / 100);
-          markCustom();
-        }}
-        display={`${Math.round(phaserCenter * 100)}%`}
-        labelColor="#f9fafb"
-        valueColor="#e5e7eb"
-        faceGradient={skin.knobFaceGradient}
-      />
-    </div>
-  </div>
+                          <Knob
+                            label="Center"
+                            min={0}
+                            max={100}
+                            value={phaserCenter * 100}
+                            onChange={(v) => {
+                              setPhaserCenter(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(phaserCenter * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+                        </div>
+                      </div>
 
-  <button
-    type="button"
-    onClick={() => {
-      setPhaserEnabled(!phaserEnabled);
-      markCustom();
-    }}
-    style={{
-      padding: '0.55rem 1.4rem',
-      borderRadius: '999px',
-      border: phaserEnabled ? skin.delayOnBorder : skin.delayOffBorder,
-      background: phaserEnabled ? skin.modeActiveBg : 'transparent',
-      color: phaserEnabled ? skin.modeActiveColor : skin.modeInactiveColor,
-      fontSize: '0.7rem',
-      textTransform: 'uppercase',
-      letterSpacing: '0.16em',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.45rem',
-      cursor: 'pointer',
-      boxShadow: phaserEnabled ? skin.controlOnShadow : skin.controlOffShadow,
-    }}
-  >
-    <span
-      style={{
-        width: 10,
-        height: 10,
-        borderRadius: '999px',
-        background: phaserEnabled ? skin.delayOnDotBg : skin.delayOffDotBg,
-      }}
-    />
-    {phaserEnabled ? 'Phaser On' : 'Phaser Off'}
-  </button>
-</div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhaserEnabled(!phaserEnabled);
+                          markCustom();
+                        }}
+                        style={{
+                          padding: '0.55rem 1.4rem',
+                          borderRadius: '999px',
+                          border: phaserEnabled ? skin.delayOnBorder : skin.delayOffBorder,
+                          background: phaserEnabled ? skin.modeActiveBg : 'transparent',
+                          color: phaserEnabled ? skin.modeActiveColor : skin.modeInactiveColor,
+                          fontSize: '0.7rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.16em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          cursor: 'pointer',
+                          boxShadow: phaserEnabled ? skin.controlOnShadow : skin.controlOffShadow,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '999px',
+                            background: phaserEnabled ? skin.delayOnDotBg : skin.delayOffDotBg,
+                          }}
+                        />
+                        {phaserEnabled ? 'Phaser On' : 'Phaser Off'}
+                      </button>
+                    </div>
 
 
                     {/* --------- PEDAL OCTAVE (prototype) ---------- */}
-<div
-  style={{
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '0.8rem',
-  }}
->
-  <div
-    style={{
-      position: 'relative',
-      width: 260,
-      height: 420,
-      backgroundImage: `url(${sitarPedalImg})`, // ✅ por ahora reutilizamos el PNG del sitar
-      backgroundSize: 'contain',
-      backgroundRepeat: 'no-repeat',
-      backgroundPosition: 'center',
-      display: 'flex',
-      alignItems: 'flex-end',
-      justifyContent: 'center',
-      paddingBottom: '1.4rem',
-    }}
-  >
-    <div
-      style={{
-        display: 'flex',
-        padding: '0.4rem 0.7rem',
-        borderRadius: 999,
-        backdropFilter: 'blur(4px)',
-        background: 'rgba(0,0,0,0.45)',
-        position: 'absolute',
-        top: '255px',
-        gap: '0.5rem',
-      }}
-    >
-      <Knob
-        label="Mix"
-        min={0}
-        max={100}
-        value={octaveMix * 100}
-        onChange={(v) => {
-          setOctaveMix(v / 100);
-          markCustom();
-        }}
-        display={`${Math.round(octaveMix * 100)}%`}
-        labelColor="#f9fafb"
-        valueColor="#e5e7eb"
-        faceGradient={skin.knobFaceGradient}
-      />
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.8rem',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: 260,
+                          height: 420,
+                          backgroundImage: `url(${sitarPedalImg})`, // ✅ por ahora reutilizamos el PNG del sitar
+                          backgroundSize: 'contain',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'center',
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          justifyContent: 'center',
+                          paddingBottom: '1.4rem',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            padding: '0.4rem 0.7rem',
+                            borderRadius: 999,
+                            backdropFilter: 'blur(4px)',
+                            background: 'rgba(0,0,0,0.45)',
+                            position: 'absolute',
+                            top: '255px',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <Knob
+                            label="Mix"
+                            min={0}
+                            max={100}
+                            value={octaveMix * 100}
+                            onChange={(v) => {
+                              setOctaveMix(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(octaveMix * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
 
-      {/* Podés dejar 2 knobs vacíos por ahora (o agregar después Tone/Track) */}
-     <Knob
-  label="Tone"
-  min={0}
-  max={100}
-  value={octaveTone * 100}
-  onChange={(v) => {
-    setOctaveTone(v / 100);
-    markCustom();
-  }}
-  display={`${Math.round(octaveTone * 100)}%`}
-  labelColor="#f9fafb"
-  valueColor="#e5e7eb"
-  faceGradient={skin.knobFaceGradient}
-/>
+                          {/* Podés dejar 2 knobs vacíos por ahora (o agregar después Tone/Track) */}
+                          <Knob
+                            label="Tone"
+                            min={0}
+                            max={100}
+                            value={octaveTone * 100}
+                            onChange={(v) => {
+                              setOctaveTone(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(octaveTone * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
 
-<Knob
-  label="Level"
-  min={0}
-  max={100}
-  value={octaveLevel * 100}
-  onChange={(v) => {
-    setOctaveLevel(v / 100);
-    markCustom();
-  }}
-  display={`${Math.round(octaveLevel * 100)}%`}
-  labelColor="#f9fafb"
-  valueColor="#e5e7eb"
-  faceGradient={skin.knobFaceGradient}
-/>
-    </div>
-  </div>
+                          <Knob
+                            label="Level"
+                            min={0}
+                            max={100}
+                            value={octaveLevel * 100}
+                            onChange={(v) => {
+                              setOctaveLevel(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(octaveLevel * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+                        </div>
+                      </div>
 
-  <button
-    type="button"
-    onClick={() => {
-      setOctaveEnabled(!octaveEnabled);
-      markCustom();
-    }}
-    style={{
-      padding: '0.5rem 1.4rem',
-      borderRadius: '999px',
-      border: octaveEnabled ? skin.delayOnBorder : skin.delayOffBorder,
-      background: octaveEnabled ? skin.modeActiveBg : 'transparent',
-      color: octaveEnabled ? skin.modeActiveColor : skin.modeInactiveColor,
-      fontSize: '0.7rem',
-      textTransform: 'uppercase',
-      letterSpacing: '0.16em',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.45rem',
-      cursor: 'pointer',
-      boxShadow: octaveEnabled ? skin.controlOnShadow : skin.controlOffShadow,
-    }}
-  >
-    <span
-      style={{
-        width: 10,
-        height: 10,
-        borderRadius: '999px',
-        background: octaveEnabled ? skin.delayOnDotBg : skin.delayOffDotBg,
-      }}
-    />
-    {octaveEnabled ? 'Octave On' : 'Octave Off'}
-  </button>
-</div>
-                     {/* --------- PEDAL FLANGER (RAGA SWEEP) ---------- */}
-  <div
-    style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: '0.8rem',
-    }}
-  >
-    <div
-      style={{
-        position: 'relative',
-        width: 260,
-        height: 420,
-        backgroundImage: `url(${flangerPedal})`,
-        backgroundSize: 'contain',
-        backgroundRepeat: 'no-repeat',
-        backgroundPosition: 'center',
-        display: 'flex',
-        alignItems: 'flex-end',
-        justifyContent: 'center',
-        paddingBottom: '1.4rem',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          padding: '0.4rem 0.7rem',
-          borderRadius: 999,
-          backdropFilter: 'blur(4px)',
-          background: 'rgba(0,0,0,0.45)',
-          position: 'absolute',
-          top: '255px',
-          gap: '0.5rem',
-        }}
-      >
-        <Knob
-          label="Rate"
-          min={0}
-          max={100}
-          value={flangerRate * 100}
-          onChange={(v) => {
-            setFlangerRate(v / 100);
-            markCustom();
-          }}
-          display={`${Math.round(flangerRate * 100)}%`}
-          labelColor="#f9fafb"
-          valueColor="#e5e7eb"
-          faceGradient={skin.knobFaceGradient}
-        />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOctaveEnabled(!octaveEnabled);
+                          markCustom();
+                        }}
+                        style={{
+                          padding: '0.5rem 1.4rem',
+                          borderRadius: '999px',
+                          border: octaveEnabled ? skin.delayOnBorder : skin.delayOffBorder,
+                          background: octaveEnabled ? skin.modeActiveBg : 'transparent',
+                          color: octaveEnabled ? skin.modeActiveColor : skin.modeInactiveColor,
+                          fontSize: '0.7rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.16em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          cursor: 'pointer',
+                          boxShadow: octaveEnabled ? skin.controlOnShadow : skin.controlOffShadow,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '999px',
+                            background: octaveEnabled ? skin.delayOnDotBg : skin.delayOffDotBg,
+                          }}
+                        />
+                        {octaveEnabled ? 'Octave On' : 'Octave Off'}
+                      </button>
+                    </div>
+                    {/* --------- PEDAL FLANGER (RAGA SWEEP) ---------- */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.8rem',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: 260,
+                          height: 420,
+                          backgroundImage: `url(${flangerPedal})`,
+                          backgroundSize: 'contain',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'center',
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          justifyContent: 'center',
+                          paddingBottom: '1.4rem',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            padding: '0.4rem 0.7rem',
+                            borderRadius: 999,
+                            backdropFilter: 'blur(4px)',
+                            background: 'rgba(0,0,0,0.45)',
+                            position: 'absolute',
+                            top: '255px',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <Knob
+                            label="Rate"
+                            min={0}
+                            max={100}
+                            value={flangerRate * 100}
+                            onChange={(v) => {
+                              setFlangerRate(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(flangerRate * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
 
-        <Knob
-          label="Depth"
-          min={0}
-          max={100}
-          value={flangerDepth * 100}
-          onChange={(v) => {
-            setFlangerDepth(v / 100);
-            markCustom();
-          }}
-          display={`${Math.round(flangerDepth * 100)}%`}
-          labelColor="#f9fafb"
-          valueColor="#e5e7eb"
-          faceGradient={skin.knobFaceGradient}
-        />
+                          <Knob
+                            label="Depth"
+                            min={0}
+                            max={100}
+                            value={flangerDepth * 100}
+                            onChange={(v) => {
+                              setFlangerDepth(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(flangerDepth * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
 
-        <Knob
-          label="Mix"
-          min={0}
-          max={100}
-          value={flangerMix * 100}
-          onChange={(v) => {
-            setFlangerMix(v / 100);
-            markCustom();
-          }}
-          display={`${Math.round(flangerMix * 100)}%`}
-          labelColor="#f9fafb"
-          valueColor="#e5e7eb"
-          faceGradient={skin.knobFaceGradient}
-        />
-      </div>
-    </div>
+                          <Knob
+                            label="Mix"
+                            min={0}
+                            max={100}
+                            value={flangerMix * 100}
+                            onChange={(v) => {
+                              setFlangerMix(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(flangerMix * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+                        </div>
+                      </div>
 
-    <button
-      type="button"
-      onClick={() => {
-        setFlangerEnabled(!flangerEnabled);
-        markCustom();
-      }}
-      style={{
-        padding: '0.5rem 1.4rem',
-        borderRadius: '999px',
-        border: flangerEnabled ? skin.delayOnBorder : skin.delayOffBorder,
-        background: flangerEnabled ? skin.modeActiveBg : 'transparent',
-        color: flangerEnabled ? skin.modeActiveColor : skin.modeInactiveColor,
-        fontSize: '0.7rem',
-        textTransform: 'uppercase',
-        letterSpacing: '0.16em',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.45rem',
-        cursor: 'pointer',
-        boxShadow: flangerEnabled ? skin.controlOnShadow : skin.controlOffShadow,
-      }}
-    >
-      <span
-        style={{
-          width: 10,
-          height: 10,
-          borderRadius: '999px',
-          background: flangerEnabled ? skin.delayOnDotBg : skin.delayOffDotBg,
-        }}
-      />
-      {flangerEnabled ? 'Flanger On' : 'Flanger Off'}
-    </button>
-  </div>
-                    {/* --------- PEDAL DISTO+ (VALVE CRUNCH) ---------- */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFlangerEnabled(!flangerEnabled);
+                          markCustom();
+                        }}
+                        style={{
+                          padding: '0.5rem 1.4rem',
+                          borderRadius: '999px',
+                          border: flangerEnabled ? skin.delayOnBorder : skin.delayOffBorder,
+                          background: flangerEnabled ? skin.modeActiveBg : 'transparent',
+                          color: flangerEnabled ? skin.modeActiveColor : skin.modeInactiveColor,
+                          fontSize: '0.7rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.16em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          cursor: 'pointer',
+                          boxShadow: flangerEnabled ? skin.controlOnShadow : skin.controlOffShadow,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '999px',
+                            background: flangerEnabled ? skin.delayOnDotBg : skin.delayOffDotBg,
+                          }}
+                        />
+                        {flangerEnabled ? 'Flanger On' : 'Flanger Off'}
+                      </button>
+                    </div>
+                    {/* --------- PEDAL DISTO+ (OD / CRUNCH / DIST) ---------- */}
                     <div
                       style={{
                         display: 'flex',
@@ -1744,6 +1752,53 @@ setPhaserCenter,
                           paddingBottom: '1.4rem',
                         }}
                       >
+                        {/* MODO (OD / CR / DIST) */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '205px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            display: 'flex',
+                            gap: '0.35rem',
+                            padding: '0.35rem 0.55rem',
+                            borderRadius: 999,
+                            backdropFilter: 'blur(4px)',
+                            background: 'rgba(0,0,0,0.45)',
+                          }}
+                        >
+                          {(['overdrive', 'crunch', 'distortion'] as const).map((m) => {
+                            const active = valveMode === m;
+                            const label = m === 'overdrive' ? 'OD' : m === 'crunch' ? 'CR' : 'DIST';
+
+                            return (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => {
+                                  setValveMode(m);
+                                  markCustom();
+                                }}
+                                style={{
+                                  padding: '0.35rem 0.55rem',
+                                  borderRadius: 999,
+                                  border: active ? skin.delayOnBorder : skin.delayOffBorder,
+                                  background: active ? skin.modeActiveBg : 'transparent',
+                                  color: active ? skin.modeActiveColor : skin.modeInactiveColor,
+                                  fontSize: '0.62rem',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.16em',
+                                  cursor: 'pointer',
+                                  boxShadow: active ? skin.controlOnShadow : skin.controlOffShadow,
+                                }}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* KNOBS */}
                         <div
                           style={{
                             display: 'flex',
@@ -1836,6 +1891,7 @@ setPhaserCenter,
                         {valveEnabled ? 'Disto+ On' : 'Disto+ Off'}
                       </button>
                     </div>
+
 
                     {/* --------- PEDAL SITAR+ (RAGA) ---------- */}
                     <div

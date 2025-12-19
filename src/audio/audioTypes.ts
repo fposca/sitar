@@ -1,7 +1,7 @@
 // src/audio/audioTypes.ts
 
 export type SitarMode = 'sharp' | 'major' | 'minor' | 'exotic';
-
+export type DriveMode = 'overdrive' | 'crunch' | 'distortion';
 export type AudioEngineContextValue = {
   status: string;
   isInputReady: boolean;
@@ -48,7 +48,8 @@ export type AudioEngineContextValue = {
   setFeedbackAmount: (value: number) => void;
   mixAmount: number;
   setMixAmount: (value: number) => void;
-
+valveMode: 'overdrive' | 'crunch' | 'distortion';
+setValveMode: (v: 'overdrive' | 'crunch' | 'distortion') => void;
   // Controles de ampli
   ampGain: number; // 0..2 aprox
   setAmpGain: (value: number) => void;
@@ -56,7 +57,8 @@ export type AudioEngineContextValue = {
   setAmpTone: (value: number) => void;
   ampMaster: number; // 0..2
   setAmpMaster: (value: number) => void;
-
+driveMode: DriveMode;
+setDriveMode: (m: DriveMode) => void;
   // Tonestack
   bassAmount: number;
   setBassAmount: (v: number) => void;
