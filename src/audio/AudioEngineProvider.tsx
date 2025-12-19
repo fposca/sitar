@@ -104,10 +104,18 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [backingName, setBackingName] = useState<string | null>(null);
   const [backingWaveform, setBackingWaveform] = useState<number[] | null>(null);
 
-      // 🎵 Octave pedal
-const [octaveEnabled, setOctaveEnabled] = useState(false);
-const [octaveMix, setOctaveMix] = useState(0.4); // 0..1
-const [octaveAmount, setOctaveAmount] = useState(1); // 1 = +1 octava
+  // ✅ Phaser
+  const [phaserEnabled, setPhaserEnabled] = useState(false);
+  const [phaserRate, setPhaserRate] = useState(0.35);     // 0..1
+  const [phaserDepth, setPhaserDepth] = useState(0.6);    // 0..1
+  const [phaserFeedback, setPhaserFeedback] = useState(0.25); // 0..1
+  const [phaserMix, setPhaserMix] = useState(0.35);       // 0..1
+  const [phaserCenter, setPhaserCenter] = useState(0.5);  // 0..1 (base freq)
+
+  // 🎵 Octave pedal
+  const [octaveEnabled, setOctaveEnabled] = useState(false);
+  const [octaveMix, setOctaveMix] = useState(0.4); // 0..1
+  const [octaveAmount, setOctaveAmount] = useState(1); // 1 = +1 octava
 
   const [isInputReady, setIsInputReady] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -179,15 +187,22 @@ const [octaveAmount, setOctaveAmount] = useState(1); // 1 = +1 octava
   const offlinePreviewStartTimeRef = useRef<number | null>(null);
   const offlinePreviewAnimRef = useRef<number | null>(null);
   const droneEnvAmountRef = useRef<GainNode | null>(null);
-const droneGainRef = useRef<GainNode | null>(null);
-// Octave pedal refs
-const octaveDryRef = useRef<GainNode | null>(null);
-const octaveWetRef = useRef<GainNode | null>(null);
-const octaveOscRef = useRef<OscillatorNode | null>(null);
-const octaveRingRef = useRef<GainNode | null>(null);
-const octaveModDepthRef = useRef<GainNode | null>(null);
-const octaveToneFilterRef = useRef<BiquadFilterNode | null>(null);
+  const droneGainRef = useRef<GainNode | null>(null);
+  // Octave pedal refs
+  const octaveDryRef = useRef<GainNode | null>(null);
+  const octaveWetRef = useRef<GainNode | null>(null);
+  const octaveOscRef = useRef<OscillatorNode | null>(null);
+  const octaveRingRef = useRef<GainNode | null>(null);
+  const octaveModDepthRef = useRef<GainNode | null>(null);
+  const octaveToneFilterRef = useRef<BiquadFilterNode | null>(null);
 
+  // ✅ Phaser refs
+  const phaserAllpassRefs = useRef<BiquadFilterNode[]>([]);
+  const phaserDryRef = useRef<GainNode | null>(null);
+  const phaserWetRef = useRef<GainNode | null>(null);
+  const phaserFeedbackRef = useRef<GainNode | null>(null);
+  const phaserLfoRef = useRef<OscillatorNode | null>(null);
+  const phaserLfoGainRef = useRef<GainNode | null>(null);
 
   // Flanger refs
   const flangerDelayRef = useRef<DelayNode | null>(null);
@@ -201,7 +216,7 @@ const octaveToneFilterRef = useRef<BiquadFilterNode | null>(null);
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
   const [processedWaveform, setProcessedWaveform] = useState<number[] | null>(null);
   const [octaveTone, setOctaveTone] = useState(0.55);  // 0..1
-const [octaveLevel, setOctaveLevel] = useState(0.9); // 0..1
+  const [octaveLevel, setOctaveLevel] = useState(0.9); // 0..1
 
   // Volumen de preview offline (0–1)
   const [offlineVolume, setOfflineVolume] = useState(1.0);
@@ -688,75 +703,81 @@ const [octaveLevel, setOctaveLevel] = useState(0.9); // 0..1
 
     ampGainNode.connect(driveNode);
     driveNode.connect(toneFilter);
+    let preFxNode: AudioNode = toneFilter;
     // ======================================================
-// 🌺 RESIDUAL DRONE ENGINE (alma del sitar)
-// ======================================================
-
-// 1) Fuente de ruido constante (muy bajo nivel)
-const droneNoiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-const noiseData = droneNoiseBuffer.getChannelData(0);
-for (let i = 0; i < noiseData.length; i++) {
-  noiseData[i] = (Math.random() * 2 - 1) * 0.15;
-}
-
-const droneNoise = ctx.createBufferSource();
-droneNoise.buffer = droneNoiseBuffer;
-droneNoise.loop = true;
-
-// 2) Filtro resonante (cuerdas simpáticas)
-const droneFilter = ctx.createBiquadFilter();
-droneFilter.type = 'bandpass';
-droneFilter.frequency.value = 2200; // rango sitar
-droneFilter.Q.value = 28;           // MUY resonante
-// 2.5) Ganancia del drone (nivel base + envelope)
-const droneGain = ctx.createGain();
-droneGain.gain.value = 0.0; // arranca cerrado, lo abre el envelope
-
-// 3) Envelope follower REAL (rectificador + lowpass)
-
-// Rectificador full-wave (abs)
-const droneRectifier = ctx.createWaveShaper();
-droneRectifier.curve = (() => {
-  const n = 2048;
-  const curve = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const x = (i / (n - 1)) * 2 - 1;
-    curve[i] = Math.abs(x);
-  }
-  return curve;
-})();
-droneRectifier.oversample = "4x";
-
-// Lowpass para suavizar la envolvente (respira lento)
-const droneEnvLP = ctx.createBiquadFilter();
-droneEnvLP.type = "lowpass";
-droneEnvLP.frequency.value = 8; // MÁS lento = más cola
-
-// Excitación desde la guitarra
-toneFilter.connect(droneRectifier);
-droneRectifier.connect(droneEnvLP);
-const droneEnvAmount = ctx.createGain();
-droneEnvAmount.gain.value = 0.0; // arranca cerrado
-droneEnvAmountRef.current = droneEnvAmount;
-
-droneGain.gain.value = 0.0; // arranca cerrado
-droneGainRef.current = droneGain;
-
-droneEnvAmount.connect(droneGain.gain);
+    // 🎵 OCTAVE PEDAL (OFFLINE)
+    // ======================================================
 
 
-droneEnvLP.connect(droneEnvAmount);
+    // ======================================================
+    // 🌺 RESIDUAL DRONE ENGINE (alma del sitar)
+    // ======================================================
 
-// Controla la ganancia del drone
+    // 1) Fuente de ruido constante (muy bajo nivel)
+    const droneNoiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const noiseData = droneNoiseBuffer.getChannelData(0);
+    for (let i = 0; i < noiseData.length; i++) {
+      noiseData[i] = (Math.random() * 2 - 1) * 0.15;
+    }
+
+    const droneNoise = ctx.createBufferSource();
+    droneNoise.buffer = droneNoiseBuffer;
+    droneNoise.loop = true;
+
+    // 2) Filtro resonante (cuerdas simpáticas)
+    const droneFilter = ctx.createBiquadFilter();
+    droneFilter.type = 'bandpass';
+    droneFilter.frequency.value = 2200; // rango sitar
+    droneFilter.Q.value = 28;           // MUY resonante
+    // 2.5) Ganancia del drone (nivel base + envelope)
+    const droneGain = ctx.createGain();
+    droneGain.gain.value = 0.0; // arranca cerrado, lo abre el envelope
+
+    // 3) Envelope follower REAL (rectificador + lowpass)
+
+    // Rectificador full-wave (abs)
+    const droneRectifier = ctx.createWaveShaper();
+    droneRectifier.curve = (() => {
+      const n = 2048;
+      const curve = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const x = (i / (n - 1)) * 2 - 1;
+        curve[i] = Math.abs(x);
+      }
+      return curve;
+    })();
+    droneRectifier.oversample = "4x";
+
+    // Lowpass para suavizar la envolvente (respira lento)
+    const droneEnvLP = ctx.createBiquadFilter();
+    droneEnvLP.type = "lowpass";
+    droneEnvLP.frequency.value = 8; // MÁS lento = más cola
+
+    // Excitación desde la guitarra
+    toneFilter.connect(droneRectifier);
+    droneRectifier.connect(droneEnvLP);
+    const droneEnvAmount = ctx.createGain();
+    droneEnvAmount.gain.value = 0.0; // arranca cerrado
+    droneEnvAmountRef.current = droneEnvAmount;
+
+    droneGain.gain.value = 0.0; // arranca cerrado
+    droneGainRef.current = droneGain;
+
+    droneEnvAmount.connect(droneGain.gain);
 
 
-// Camino del drone
-droneNoise.connect(droneFilter);
-droneFilter.connect(droneGain);
-droneGain.connect(masterGain);
+    droneEnvLP.connect(droneEnvAmount);
 
-// Arrancar ruido
-droneNoise.start();
+    // Controla la ganancia del drone
+
+
+    // Camino del drone
+    droneNoise.connect(droneFilter);
+    droneFilter.connect(droneGain);
+    droneGain.connect(masterGain);
+
+    // Arrancar ruido
+    droneNoise.start();
 
 
     // === VALVE CRUNCH (pedal aparte) ===
@@ -777,145 +798,220 @@ droneNoise.start();
 
 
     // Re-wire: driveNode -> toneFilter -> valve -> (de ahí sale todo el resto)
-  toneFilter.connect(valveShaper);
-  valveShaper.connect(valveToneFilter);
+    toneFilter.connect(valveShaper);
+    valveShaper.connect(valveToneFilter);
     valveToneFilter.connect(valveLevelGain);
 
-   preSitarNode = valveLevelGain;
+    preSitarNode = valveLevelGain;
+    // ======================================================
+    // 🎵 OCTAVE PEDAL (MAIN graph) — ring-mod simple
+    // ======================================================
 
-   // ======================================================
-// 🎵 OCTAVE PEDAL (MAIN graph) — ring-mod simple
-// ======================================================
- // Split dry/wet
-const octaveDry = ctx.createGain();
-octaveDry.gain.value = 1.0;
-octaveDryRef.current = octaveDry;
+    // Split dry/wet
+    const octaveDryNode = ctx.createGain();
+    octaveDryNode.gain.value = 1.0;
+    octaveDryRef.current = octaveDryNode;
 
-// “Ring” (audio * osc)
-const octaveRing = ctx.createGain();
-octaveRing.gain.value = 1.0; // el multiplicador real lo maneja octaveRing.gain (modulado)
-octaveRingRef.current = octaveRing;
+    // “Ring” (audio * osc)
+    const octaveRingNode = ctx.createGain();
+    octaveRingNode.gain.value = 1.0;
+    octaveRingRef.current = octaveRingNode;
 
-// Wet gain (level real del octave)
-const octaveWet = ctx.createGain();
-octaveWet.gain.value = 0.0; // arranca apagado, lo prende useEffect
-octaveWetRef.current = octaveWet;
+    // Wet gain (level real del octave)
+    const octaveWetNode = ctx.createGain();
+    octaveWetNode.gain.value = 0.0; // lo prende useEffect
+    octaveWetRef.current = octaveWetNode;
 
-// Tone filter del wet (lowpass)
-const octaveToneFilter = ctx.createBiquadFilter();
-octaveToneFilter.type = 'lowpass';
-octaveToneFilter.frequency.value = 800 + octaveTone * (16000 - 800);
-octaveToneFilterRef.current = octaveToneFilter;
+    // Tone filter del wet (lowpass)
+    const octaveToneFilterNode = ctx.createBiquadFilter();
+    octaveToneFilterNode.type = 'lowpass';
+    octaveToneFilterNode.frequency.value = 800 + octaveTone * (16000 - 800);
+    octaveToneFilterRef.current = octaveToneFilterNode;
 
-// Oscillator (modulador)
-const octaveOsc = ctx.createOscillator();
-octaveOsc.type = 'sine';
-octaveOsc.frequency.value = 440; // (después lo podemos afinar a gusto)
-octaveOscRef.current = octaveOsc;
+    // Oscillator (modulador)
+    const octaveOscNode = ctx.createOscillator();
+    octaveOscNode.type = 'sine';
+    octaveOscNode.frequency.value = 440;
+    octaveOscRef.current = octaveOscNode;
 
-// ✅ Mod depth real (este es el “on/off” verdadero)
-const octaveModDepth = ctx.createGain();
-octaveModDepth.gain.value = 0.0; // arranca off
-octaveModDepthRef.current = octaveModDepth;
+    // ✅ Mod depth real (on/off verdadero)
+    const octaveModDepthNode = ctx.createGain();
+    octaveModDepthNode.gain.value = 0.0; // arranca OFF
+    octaveModDepthRef.current = octaveModDepthNode;
 
-// Conexión: osc -> modDepth -> ring.gain
-octaveOsc.connect(octaveModDepth);
-octaveModDepth.connect(octaveRing.gain);
-octaveOsc.start();
+    octaveOscNode.connect(octaveModDepthNode);
+    octaveModDepthNode.connect(octaveRingNode.gain);
+    octaveOscNode.start();
 
-// Routing: preSitarNode -> dry + ring
-preSitarNode.connect(octaveDry);
-preSitarNode.connect(octaveRing);
+    // Routing: preSitarNode -> dry + ring
+    preSitarNode.connect(octaveDryNode);
+    preSitarNode.connect(octaveRingNode);
 
-// Wet chain: ring -> toneFilter -> wetGain
-octaveRing.connect(octaveToneFilter);
-octaveToneFilter.connect(octaveWet);
+    // Wet chain: ring -> toneFilter -> wetGain
+    octaveRingNode.connect(octaveToneFilterNode);
+    octaveToneFilterNode.connect(octaveWetNode);
 
-// Mix out: dry + wet -> octaveOut
-const octaveOut = ctx.createGain();
-octaveDry.connect(octaveOut);
-octaveWet.connect(octaveOut);
+    // Mix out
+    const octaveOutNode = ctx.createGain();
+    octaveDryNode.connect(octaveOutNode);
+    octaveWetNode.connect(octaveOutNode);
 
-// Desde ahora, el flujo sigue desde octaveOut
-preSitarNode = octaveOut;
-
+    // Desde ahora, el flujo sigue desde octaveOutNode
+    preSitarNode = octaveOutNode;
 
 
+    // ======================================================
+    // 🎛️ PHASER (MAIN graph)
+    // ======================================================
+    const phaserIn = ctx.createGain();
+    phaserIn.gain.value = 1.0;
 
-// === FLANGER (Raga Sweep) ===
-// Lo armamos acá para que afecte tanto señal dry como sitar antes del delay principal
-const flangerIn = ctx.createGain();
-flangerIn.gain.value = 1.0;
+    // dry/wet
+    const phaserDry = ctx.createGain();
+    phaserDry.gain.value = 1.0;
+    phaserDryRef.current = phaserDry;
 
-const flangerDelay = ctx.createDelay(0.02); // 20ms max
-flangerDelay.delayTime.value = 0.003; // base 3ms
-flangerDelayRef.current = flangerDelay;
+    const phaserWet = ctx.createGain();
+    phaserWet.gain.value = 0.0;
+    phaserWetRef.current = phaserWet;
 
-const flangerFeedbackGain = ctx.createGain();
-flangerFeedbackGain.gain.value = 0.0;
-flangerFeedbackRef.current = flangerFeedbackGain;
+    // feedback
+    const phaserFb = ctx.createGain();
+    phaserFb.gain.value = 0.0;
+    phaserFeedbackRef.current = phaserFb;
 
-const flangerDry = ctx.createGain();
-flangerDry.gain.value = 1.0;
-flangerDryRef.current = flangerDry;
+    // 4 a 6 stages suena bien. Arrancá con 6.
+    const stages = 6;
+    const allpasses: BiquadFilterNode[] = [];
 
-const flangerWet = ctx.createGain();
-flangerWet.gain.value = 0.0;
-flangerWetRef.current = flangerWet;
+    for (let i = 0; i < stages; i++) {
+      const ap = ctx.createBiquadFilter();
+      ap.type = 'allpass';
+      ap.frequency.value = 900; // base (después lo modula el LFO)
+      ap.Q.value = 0.7;         // suave
+      allpasses.push(ap);
+    }
+    phaserAllpassRefs.current = allpasses;
 
-// feedback loop
-flangerDelay.connect(flangerFeedbackGain);
-flangerFeedbackGain.connect(flangerDelay);
-// LFO modula delayTime
-const flangerLFO = ctx.createOscillator();
-flangerLFO.type = 'sine';
-flangerLFO.frequency.value = 0.3; // se actualiza por useEffect
-flangerLfoRef.current = flangerLFO;
+    // chain allpass
+    phaserIn.connect(allpasses[0]);
+    for (let i = 0; i < stages - 1; i++) {
+      allpasses[i].connect(allpasses[i + 1]);
+    }
 
-const flangerLFOGain = ctx.createGain();
-flangerLFOGain.gain.value = 0.0; // profundidad (segundos) por useEffect
-flangerLfoGainRef.current = flangerLFOGain;
+    // feedback loop: output -> fb -> input
+    allpasses[stages - 1].connect(phaserFb);
+    phaserFb.connect(phaserIn);
 
-flangerLFO.connect(flangerLFOGain);
-flangerLFOGain.connect(flangerDelay.delayTime);
-flangerLFO.start();
+    // wet out desde el último allpass
+    allpasses[stages - 1].connect(phaserWet);
+
+    // dry path
+    phaserIn.connect(phaserDry);
+
+    // mix
+    const phaserOut = ctx.createGain();
+    phaserDry.connect(phaserOut);
+    phaserWet.connect(phaserOut);
+
+    // LFO para modular frecuencia de TODOS los allpass
+    const phaserLFO = ctx.createOscillator();
+    phaserLFO.type = 'sine';
+    phaserLFO.frequency.value = 0.3;
+    phaserLfoRef.current = phaserLFO;
+
+    const phaserLFOGain = ctx.createGain();
+    // en Hz (se ajusta por useEffect)
+    phaserLFOGain.gain.value = 0;
+    phaserLfoGainRef.current = phaserLFOGain;
+
+    phaserLFO.connect(phaserLFOGain);
+
+    // con esto un LFO modula muchas frecuencias
+    allpasses.forEach((ap) => phaserLFOGain.connect(ap.frequency));
+
+    phaserLFO.start();
+
+    // Routing: preSitarNode -> phaserIn, y el "nuevo preSitarNode" es phaserOut
+    preSitarNode.connect(phaserIn);
+    preSitarNode = phaserOut;
 
 
-// routing flanger: in -> dry + delay -> wet -> out
-const flangerOut = ctx.createGain();
-flangerOut.gain.value = 1.0;
-flangerIn.connect(flangerDry);
-flangerIn.connect(flangerDelay);
-flangerDelay.connect(flangerWet);
 
-flangerDry.connect(flangerOut);
-flangerWet.connect(flangerOut);
+    // === FLANGER (Raga Sweep) ===
+    // Lo armamos acá para que afecte tanto señal dry como sitar antes del delay principal
+    const flangerIn = ctx.createGain();
+    flangerIn.gain.value = 1.0;
 
-// Conectar preSitar al flangerIn
-preSitarNode.connect(flangerIn);
+    const flangerDelay = ctx.createDelay(0.02); // 20ms max
+    flangerDelay.delayTime.value = 0.003; // base 3ms
+    flangerDelayRef.current = flangerDelay;
 
-// Desde ahora, todo lo que antes iba a preDelayGain, sale de flangerOut
-const preDelayInput = flangerOut;
-// ✅ CONEXIONES SITAR (LIVE) — acá SÍ existe preDelayInput
+    const flangerFeedbackGain = ctx.createGain();
+    flangerFeedbackGain.gain.value = 0.0;
+    flangerFeedbackRef.current = flangerFeedbackGain;
 
-// Alimentar el camino WET (jawari + resonancias)
-preDelayInput.connect(sitarBandpass);
-sitarBandpass.connect(jawariDrive);
-jawariDrive.connect(jawariDelay);
-jawariDelay.connect(jawariFeedback);
-jawariFeedback.connect(jawariDelay);
-jawariDelay.connect(jawariHighpass);
-jawariHighpass.connect(sitarWetGain);
+    const flangerDry = ctx.createGain();
+    flangerDry.gain.value = 1.0;
+    flangerDryRef.current = flangerDry;
 
-// Sympathetic en paralelo (entra también al wet)
-preDelayInput.connect(sitarSympathetic);
-sitarSympathetic.connect(sitarWetGain);
+    const flangerWet = ctx.createGain();
+    flangerWet.gain.value = 0.0;
+    flangerWetRef.current = flangerWet;
 
-// Sitar paths
-preDelayInput.connect(sitarDryGain);
-// Mix dry + sitar into preDelay (ahora entra por preDelayGain)
-sitarDryGain.connect(preDelayGain);
-sitarWetGain.connect(preDelayGain);
+    // feedback loop
+    flangerDelay.connect(flangerFeedbackGain);
+    flangerFeedbackGain.connect(flangerDelay);
+    // LFO modula delayTime
+    const flangerLFO = ctx.createOscillator();
+    flangerLFO.type = 'sine';
+    flangerLFO.frequency.value = 0.3; // se actualiza por useEffect
+    flangerLfoRef.current = flangerLFO;
+
+    const flangerLFOGain = ctx.createGain();
+    flangerLFOGain.gain.value = 0.0; // profundidad (segundos) por useEffect
+    flangerLfoGainRef.current = flangerLFOGain;
+
+    flangerLFO.connect(flangerLFOGain);
+    flangerLFOGain.connect(flangerDelay.delayTime);
+    flangerLFO.start();
+
+
+    // routing flanger: in -> dry + delay -> wet -> out
+    const flangerOut = ctx.createGain();
+    flangerOut.gain.value = 1.0;
+    flangerIn.connect(flangerDry);
+    flangerIn.connect(flangerDelay);
+    flangerDelay.connect(flangerWet);
+
+    flangerDry.connect(flangerOut);
+    flangerWet.connect(flangerOut);
+
+    // Conectar preSitar al flangerIn
+    preSitarNode.connect(flangerIn);
+
+    // Desde ahora, todo lo que antes iba a preDelayGain, sale de flangerOut
+    const preDelayInput = flangerOut;
+    // ✅ CONEXIONES SITAR (LIVE) — acá SÍ existe preDelayInput
+
+    // Alimentar el camino WET (jawari + resonancias)
+    preDelayInput.connect(sitarBandpass);
+    sitarBandpass.connect(jawariDrive);
+    jawariDrive.connect(jawariDelay);
+    jawariDelay.connect(jawariFeedback);
+    jawariFeedback.connect(jawariDelay);
+    jawariDelay.connect(jawariHighpass);
+    jawariHighpass.connect(sitarWetGain);
+
+    // Sympathetic en paralelo (entra también al wet)
+    preDelayInput.connect(sitarSympathetic);
+    sitarSympathetic.connect(sitarWetGain);
+
+    // Sitar paths
+    preDelayInput.connect(sitarDryGain);
+    // Mix dry + sitar into preDelay (ahora entra por preDelayGain)
+    sitarDryGain.connect(preDelayGain);
+    sitarWetGain.connect(preDelayGain);
 
     // Delay network
     preDelayGain.connect(dryGain);
@@ -1091,7 +1187,7 @@ sitarWetGain.connect(preDelayGain);
         jawariDrive.oversample = '4x';
 
         const jawariDelay = offlineCtx.createDelay(0.02);
-        jawariDelay.delayTime.value =  0.0009;
+        jawariDelay.delayTime.value = 0.0009;
 
         const jawariFeedback = offlineCtx.createGain();
         jawariFeedback.gain.value = 0.35;
@@ -1139,55 +1235,138 @@ sitarWetGain.connect(preDelayGain);
         src.connect(inputGain);
         inputGain.connect(driveNode);
         driveNode.connect(toneFilter);
- 
-// ======================================================
-// 🎵 OCTAVE PEDAL (OFFLINE) — usar offlineCtx
-// ======================================================
-const octaveDry = offlineCtx.createGain();
-const octaveRing = offlineCtx.createGain();
-octaveDry.gain.value = 1.0;
-octaveRing.gain.value = 0.0;
+        // ======================================================
+        // 🔗 FX CHAIN OFFLINE (octave + phaser)
+        // ======================================================
+        let preFxOffline: AudioNode = toneFilter;
 
-const octaveOsc = offlineCtx.createOscillator();
-octaveOsc.type = 'sine';
-octaveOsc.frequency.value = 880;
-octaveOsc.start();
+        // -------- OCTAVE (OFFLINE) --------
+        const octaveDryOff = offlineCtx.createGain();
+        const octaveRingOff = offlineCtx.createGain();
+        const octaveOutOff = offlineCtx.createGain();
 
-// toneFilter -> dry + ring
-toneFilter.connect(octaveDry);
-toneFilter.connect(octaveRing);
-octaveOsc.connect(octaveRing.gain);
+        octaveDryOff.gain.value = 1.0;
+        octaveRingOff.gain.value = octaveEnabled ? octaveMix : 0;
 
-// mix out
-const octaveOut = offlineCtx.createGain();
-octaveDry.connect(octaveOut);
-octaveRing.connect(octaveOut);
+        preFxOffline.connect(octaveDryOff);
+        preFxOffline.connect(octaveRingOff);
 
-// y a partir de acá seguís con octaveOut en vez de toneFilter:
-const preSitar = octaveOut;
+        octaveDryOff.connect(octaveOutOff);
+        octaveRingOff.connect(octaveOutOff);
+
+        preFxOffline = octaveOutOff;
+
+        // -------- PHASER (OFFLINE) --------
+        const phaserInOff = offlineCtx.createGain();
+
+        const phaserDryOff = offlineCtx.createGain();
+        const phaserWetOff = offlineCtx.createGain();
+        phaserDryOff.gain.value = 1 - (phaserEnabled ? phaserMix : 0);
+        phaserWetOff.gain.value = phaserEnabled ? phaserMix : 0;
+
+        const phaserFbOff = offlineCtx.createGain();
+        phaserFbOff.gain.value = phaserEnabled ? phaserFeedback * 0.85 : 0;
+
+        const stagesOff = 6;
+        const allpassesOff: BiquadFilterNode[] = [];
+
+        for (let i = 0; i < stagesOff; i++) {
+          const ap = offlineCtx.createBiquadFilter();
+          ap.type = 'allpass';
+          ap.Q.value = 0.7;
+          allpassesOff.push(ap);
+        }
+
+        phaserInOff.connect(allpassesOff[0]);
+        for (let i = 0; i < stagesOff - 1; i++) {
+          allpassesOff[i].connect(allpassesOff[i + 1]);
+        }
+
+        // feedback loop
+        allpassesOff[stagesOff - 1].connect(phaserFbOff);
+        phaserFbOff.connect(phaserInOff);
+
+        // wet/dry
+        allpassesOff[stagesOff - 1].connect(phaserWetOff);
+        phaserInOff.connect(phaserDryOff);
+
+        // out
+        const phaserOutOff = offlineCtx.createGain();
+        phaserDryOff.connect(phaserOutOff);
+        phaserWetOff.connect(phaserOutOff);
+
+        // LFO
+        const lfoOff = offlineCtx.createOscillator();
+        lfoOff.type = 'sine';
+        lfoOff.frequency.value = 0.05 + phaserRate * 2.5;
+
+        const lfoGainOff = offlineCtx.createGain();
+        lfoGainOff.gain.value = 50 + phaserDepth * 1400;
+
+        lfoOff.connect(lfoGainOff);
+
+        const baseFreqOff = 250 + phaserCenter * (1800 - 250);
+        allpassesOff.forEach((ap) => {
+          ap.frequency.value = baseFreqOff;
+          lfoGainOff.connect(ap.frequency);
+        });
+
+        lfoOff.start();
+
+        // routing: preFxOffline -> phaserInOff -> phaserOutOff
+        preFxOffline.connect(phaserInOff);
+        preFxOffline = phaserOutOff;
+
+
+        // ======================================================
+        // 🎵 OCTAVE PEDAL (OFFLINE) — usar offlineCtx
+        // ======================================================
+        const octaveDry = offlineCtx.createGain();
+        const octaveRing = offlineCtx.createGain();
+        octaveDry.gain.value = 1.0;
+        octaveRing.gain.value = 0.0;
+
+        const octaveOsc = offlineCtx.createOscillator();
+        octaveOsc.type = 'sine';
+        octaveOsc.frequency.value = 880;
+        octaveOsc.start();
+
+        // toneFilter -> dry + ring
+        toneFilter.connect(octaveDry);
+        toneFilter.connect(octaveRing);
+        octaveOsc.connect(octaveRing.gain);
+
+        // mix out
+        const octaveOut = offlineCtx.createGain();
+        octaveDry.connect(octaveOut);
+        octaveRing.connect(octaveOut);
+
+        // y a partir de acá seguís con octaveOut en vez de toneFilter:
+        const preSitar = octaveOut;
 
 
 
-// // Conexiones
-// toneFilter.connect(octaveDry);
-// toneFilter.connect(octaveRing);
+        // // Conexiones
+        // toneFilter.connect(octaveDry);
+        // toneFilter.connect(octaveRing);
 
-// octaveOsc.connect(octaveRing.gain);
+        // octaveOsc.connect(octaveRing.gain);
 
-// // Mix
-// const octaveOut = ctx.createGain();
-// octaveDry.connect(octaveOut);
-// octaveRing.connect(octaveOut);
+        // // Mix
+        // const octaveOut = ctx.createGain();
+        // octaveDry.connect(octaveOut);
+        // octaveRing.connect(octaveOut);
 
-// // Desde ahora, preSitarNode sale de octaveOut
-// preSitarNode = octaveOut;
+        // // Desde ahora, preSitarNode sale de octaveOut
+        // preSitarNode = octaveOut;
 
 
-        // sitar dry
-        toneFilter.connect(sitarDryGain);
-
+        // sitar dry/wet entra desde la cadena OFFLINE
+        preFxOffline.connect(sitarDryGain);
+        preFxOffline.connect(sitarBandpass);
+        preFxOffline.connect(sitarSympathetic);
         // sitar “jawari”
-        toneFilter.connect(sitarBandpass);
+
         sitarBandpass.connect(jawariDrive);
         jawariDrive.connect(jawariDelay);
         jawariDelay.connect(jawariFeedback);
@@ -1196,7 +1375,7 @@ const preSitar = octaveOut;
         jawariHighpass.connect(sitarWetGain);
 
         // sitar “sympathetic”
-        toneFilter.connect(sitarSympathetic);
+
         sitarSympathetic.connect(sitarWetGain);
 
         // mix sitar
@@ -1299,127 +1478,162 @@ const preSitar = octaveOut;
     }
   }, [audioContext]);
   useEffect(() => {
-  if (!audioContext) return;
-  const env = droneEnvAmountRef.current;
-  const g = droneGainRef.current;
-  if (!env || !g) return;
+    if (!audioContext) return;
+    const env = droneEnvAmountRef.current;
+    const g = droneGainRef.current;
+    if (!env || !g) return;
 
-  const t = audioContext.currentTime;
+    const t = audioContext.currentTime;
 
-  if (!ragaEnabled || ragaDroneLevel <= 0.001) {
-    env.gain.setTargetAtTime(0, t, 0.03);
-    g.gain.setTargetAtTime(0, t, 0.03);
-    return;
-  }
+    if (!ragaEnabled || ragaDroneLevel <= 0.001) {
+      env.gain.setTargetAtTime(0, t, 0.03);
+      g.gain.setTargetAtTime(0, t, 0.03);
+      return;
+    }
 
-  // cuánto abre la envolvente (subí/bajá a gusto)
-  env.gain.setTargetAtTime(0.35 * ragaDroneLevel, t, 0.03);
-}, [audioContext, ragaEnabled, ragaDroneLevel]);
-useEffect(() => {
-  if (!audioContext) return;
+    // cuánto abre la envolvente (subí/bajá a gusto)
+    env.gain.setTargetAtTime(0.35 * ragaDroneLevel, t, 0.03);
+  }, [audioContext, ragaEnabled, ragaDroneLevel]);
 
-  const t = audioContext.currentTime;
-  const dry = octaveDryRef.current;
-  const ring = octaveRingRef.current;
-  // si lo pasás a ref real:
-  const modDepth = (octaveModDepthRef as any).current as GainNode | null;
+  useEffect(() => {
+    if (!audioContext) return;
 
-  if (!dry || !ring || !modDepth) return;
+    const allpasses = phaserAllpassRefs.current;
+    const wet = phaserWetRef.current;
+    const dry = phaserDryRef.current;
+    const fb = phaserFeedbackRef.current;
+    const lfo = phaserLfoRef.current;
+    const lfoGain = phaserLfoGainRef.current;
 
-  if (!octaveEnabled) {
-    dry.gain.setTargetAtTime(1, t, 0.01);
-    modDepth.gain.setTargetAtTime(0, t, 0.01); // ✅ off real
-    return;
-  }
+    if (!allpasses.length || !wet || !dry || !fb || !lfo || !lfoGain) return;
 
-  dry.gain.setTargetAtTime(1 - octaveMix, t, 0.01);
-  modDepth.gain.setTargetAtTime(octaveMix * 0.8, t, 0.01);
-}, [audioContext, octaveEnabled, octaveMix]);
+    const t = audioContext.currentTime;
 
-useEffect(() => {
-  if (!audioContext) return;
-  const f = octaveToneFilterRef.current;
-  if (!f) return;
+    // ON/OFF por mix (simple, estable)
+    const mix = phaserEnabled ? phaserMix : 0;
+    wet.gain.setTargetAtTime(mix, t, 0.01);
+    dry.gain.setTargetAtTime(1 - mix, t, 0.01);
 
-  const t = audioContext.currentTime;
-  const minF = 800;
-  const maxF = 16000;
-  const freq = minF + octaveTone * (maxF - minF);
+    // Rate: 0..1 -> 0.05..2.5 Hz
+    const minHz = 0.05;
+    const maxHz = 2.5;
+    const hz = minHz + phaserRate * (maxHz - minHz);
+    lfo.frequency.setTargetAtTime(hz, t, 0.01);
 
-  f.frequency.setTargetAtTime(freq, t, 0.01);
-}, [audioContext, octaveTone]);
-useEffect(() => {
-  if (!audioContext) return;
+    // Center freq: 0..1 -> 250..1800 Hz (zona “phaser guitarra”)
+    const minF = 250;
+    const maxF = 1800;
+    const base = minF + phaserCenter * (maxF - minF);
 
-  const wet = octaveWetRef.current;
-  if (!wet) return;
+    // Depth: rango de barrido (Hz)
+    const sweep = 50 + phaserDepth * 1400;
+    lfoGain.gain.setTargetAtTime(sweep, t, 0.01);
 
-  const t = audioContext.currentTime;
+    // Set base en cada allpass (el LFO suma/resta alrededor)
+    allpasses.forEach((ap) => {
+      ap.frequency.setTargetAtTime(base, t, 0.01);
+      ap.Q.setTargetAtTime(0.7, t, 0.01);
+    });
 
-  // wet = (mix * level) cuando está ON, si no 0
- const targetWet = octaveEnabled
-  ? octaveMix * (0.5 + octaveLevel * 1.5)
-  : 0;
-  wet.gain.setTargetAtTime(targetWet, t, 0.01);
-}, [audioContext, octaveEnabled, octaveMix, octaveLevel]);
-useEffect(() => {
-  if (!audioContext) return;
+    // Feedback: 0..1 -> 0..0.85 (cuidado auto-osc)
+    const fbAmt = phaserEnabled ? phaserFeedback * 0.85 : 0;
+    fb.gain.setTargetAtTime(fbAmt, t, 0.01);
+  }, [
+    audioContext,
+    phaserEnabled,
+    phaserRate,
+    phaserDepth,
+    phaserCenter,
+    phaserFeedback,
+    phaserMix,
+  ]);
 
-  const t = audioContext.currentTime;
-  const dry = octaveDryRef.current;
-  const modDepth = octaveModDepthRef.current;
+  
 
-  if (!dry || !modDepth) return;
+  useEffect(() => {
+    if (!audioContext) return;
+    const f = octaveToneFilterRef.current;
+    if (!f) return;
 
-  if (!octaveEnabled) {
-    dry.gain.setTargetAtTime(1, t, 0.01);
-    modDepth.gain.setTargetAtTime(0, t, 0.01); // OFF real
-    return;
-  }
+    const t = audioContext.currentTime;
+    const minF = 800;
+    const maxF = 16000;
+    const freq = minF + octaveTone * (maxF - minF);
 
-  dry.gain.setTargetAtTime(1 - octaveMix, t, 0.01);
+    f.frequency.setTargetAtTime(freq, t, 0.01);
+  }, [audioContext, octaveTone]);
+  useEffect(() => {
+    if (!audioContext) return;
 
-  // cuánto “muerde” el ring (ajustable)
- modDepth.gain.setTargetAtTime(octaveMix * 2.0, t, 0.01);
-}, [audioContext, octaveEnabled, octaveMix]);
+    const wet = octaveWetRef.current;
+    if (!wet) return;
+
+    const t = audioContext.currentTime;
+
+    // wet = (mix * level) cuando está ON, si no 0
+    const targetWet = octaveEnabled
+      ? octaveMix * (0.5 + octaveLevel * 1.5)
+      : 0;
+    wet.gain.setTargetAtTime(targetWet, t, 0.01);
+  }, [audioContext, octaveEnabled, octaveMix, octaveLevel]);
+  useEffect(() => {
+    if (!audioContext) return;
+
+    const t = audioContext.currentTime;
+    const dry = octaveDryRef.current;
+    const modDepth = octaveModDepthRef.current;
+
+    if (!dry || !modDepth) return;
+
+    if (!octaveEnabled) {
+      dry.gain.setTargetAtTime(1, t, 0.01);
+      modDepth.gain.setTargetAtTime(0, t, 0.01); // OFF real
+      return;
+    }
+
+    dry.gain.setTargetAtTime(1 - octaveMix, t, 0.01);
+
+    // cuánto “muerde” el ring (ajustable)
+    modDepth.gain.setTargetAtTime(octaveMix * 2.0, t, 0.01);
+  }, [audioContext, octaveEnabled, octaveMix]);
 
 
-useEffect(() => {
-  if (!audioContext) return;
+  useEffect(() => {
+    if (!audioContext) return;
 
-  const d = flangerDelayRef.current;
-  const fb = flangerFeedbackRef.current;
-  const wet = flangerWetRef.current;
-  const dry = flangerDryRef.current;
-  const lfo = flangerLfoRef.current;
-  const lfoGain = flangerLfoGainRef.current;
-  if (!d || !fb || !wet || !dry || !lfo || !lfoGain) return;
+    const d = flangerDelayRef.current;
+    const fb = flangerFeedbackRef.current;
+    const wet = flangerWetRef.current;
+    const dry = flangerDryRef.current;
+    const lfo = flangerLfoRef.current;
+    const lfoGain = flangerLfoGainRef.current;
+    if (!d || !fb || !wet || !dry || !lfo || !lfoGain) return;
 
-  const t = audioContext.currentTime;
+    const t = audioContext.currentTime;
 
-  // Base delay (ms)
-  const baseMs = 2.5;
-  d.delayTime.setTargetAtTime(baseMs / 1000, t, 0.01);
+    // Base delay (ms)
+    const baseMs = 2.5;
+    d.delayTime.setTargetAtTime(baseMs / 1000, t, 0.01);
 
-  // Rate: 0..1 -> 0.05..1.2 Hz (lento/místico)
-  const minHz = 0.05;
-  const maxHz = 1.2;
-  const hz = minHz + flangerRate * (maxHz - minHz);
-  lfo.frequency.setTargetAtTime(hz, t, 0.01);
+    // Rate: 0..1 -> 0.05..1.2 Hz (lento/místico)
+    const minHz = 0.05;
+    const maxHz = 1.2;
+    const hz = minHz + flangerRate * (maxHz - minHz);
+    lfo.frequency.setTargetAtTime(hz, t, 0.01);
 
-  // Depth: 0..1 -> 0..4ms (en segundos)
-  const depthMs = 4.0 * flangerDepth;
-  lfoGain.gain.setTargetAtTime(depthMs / 1000, t, 0.01);
+    // Depth: 0..1 -> 0..4ms (en segundos)
+    const depthMs = 4.0 * flangerDepth;
+    lfoGain.gain.setTargetAtTime(depthMs / 1000, t, 0.01);
 
-  // Mix
-  const mix = flangerEnabled ? flangerMix : 0;
-  wet.gain.setTargetAtTime(mix, t, 0.01);
-  dry.gain.setTargetAtTime(1 - mix, t, 0.01);
+    // Mix
+    const mix = flangerEnabled ? flangerMix : 0;
+    wet.gain.setTargetAtTime(mix, t, 0.01);
+    dry.gain.setTargetAtTime(1 - mix, t, 0.01);
 
-  // Feedback
-  const fbAmt = flangerEnabled ? flangerFeedback * 0.85 : 0;
-  fb.gain.setTargetAtTime(fbAmt, t, 0.01);
-}, [audioContext, flangerEnabled, flangerRate, flangerDepth, flangerFeedback, flangerMix]);
+    // Feedback
+    const fbAmt = flangerEnabled ? flangerFeedback * 0.85 : 0;
+    fb.gain.setTargetAtTime(fbAmt, t, 0.01);
+  }, [audioContext, flangerEnabled, flangerRate, flangerDepth, flangerFeedback, flangerMix]);
 
 
   // loop del cursor
@@ -1969,7 +2183,7 @@ useEffect(() => {
     backingName,
     backingWaveform,
     playbackProgress,
-// Flanger
+    // Flanger
     flangerEnabled,
     setFlangerEnabled,
     flangerRate,
@@ -1980,7 +2194,21 @@ useEffect(() => {
     setFlangerFeedback,
     flangerMix,
     setFlangerMix,
-    
+
+    // Phaser
+    phaserEnabled,
+    setPhaserEnabled,
+    phaserRate,
+    setPhaserRate,
+    phaserDepth,
+    setPhaserDepth,
+    phaserFeedback,
+    setPhaserFeedback,
+    phaserMix,
+    setPhaserMix,
+    phaserCenter,
+    setPhaserCenter,
+
     // Delay
     delayTimeMs,
     setDelayTimeMs,
@@ -2026,10 +2254,10 @@ useEffect(() => {
     setSitarAmount,
     sitarMode,
     setSitarMode,
-octaveTone,
-setOctaveTone,
-octaveLevel,
-setOctaveLevel,
+    octaveTone,
+    setOctaveTone,
+    octaveLevel,
+    setOctaveLevel,
     // Drive
     driveAmount,
     setDriveAmount,
@@ -2064,7 +2292,7 @@ setOctaveLevel,
     offlineVolume,
     setOfflineVolume,
     offlinePreviewProgress,
- // Octave
+    // Octave
     octaveEnabled,
     setOctaveEnabled,
     octaveMix,

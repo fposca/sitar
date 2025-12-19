@@ -528,6 +528,20 @@ setOctaveLevel,
     setFlangerDepth,
     flangerMix,
     setFlangerMix,
+
+    // ✅ PHASER
+phaserEnabled,
+setPhaserEnabled,
+phaserRate,
+setPhaserRate,
+phaserDepth,
+setPhaserDepth,
+phaserFeedback,
+setPhaserFeedback,
+phaserMix,
+setPhaserMix,
+phaserCenter,
+setPhaserCenter,
   } = useAudioEngine();
 
   const [selectedPreset, setSelectedPreset] = useState<PresetId | 'custom'>(
@@ -1324,6 +1338,154 @@ setOctaveLevel,
                         {delayEnabled ? 'Delay On' : 'Delay Off'}
                       </button>
                     </div>
+
+{/* ✅ PHASER */}
+<div
+  style={{
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.8rem',
+  }}
+>
+  <div
+    style={{
+      position: 'relative',
+      width: 260,
+      height: 420,
+      backgroundImage: `url(${pedalImg})`,
+      backgroundSize: 'contain',
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: 'center',
+      display: 'flex',
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+      paddingBottom: '1.4rem',
+    }}
+  >
+    <div
+      style={{
+        display: 'flex',
+        padding: '0.4rem 0.7rem',
+        borderRadius: 999,
+        backdropFilter: 'blur(4px)',
+        background: 'rgba(0,0,0,0.45)',
+        position: 'absolute',
+        top: '255px',
+        gap: '0.5rem',
+      }}
+    >
+      <Knob
+        label="Rate"
+        min={0}
+        max={100}
+        value={phaserRate * 100}
+        onChange={(v) => {
+          setPhaserRate(v / 100);
+          markCustom();
+        }}
+        display={`${Math.round(phaserRate * 100)}%`}
+        labelColor="#f9fafb"
+        valueColor="#e5e7eb"
+        faceGradient={skin.knobFaceGradient}
+      />
+
+      <Knob
+        label="Depth"
+        min={0}
+        max={100}
+        value={phaserDepth * 100}
+        onChange={(v) => {
+          setPhaserDepth(v / 100);
+          markCustom();
+        }}
+        display={`${Math.round(phaserDepth * 100)}%`}
+        labelColor="#f9fafb"
+        valueColor="#e5e7eb"
+        faceGradient={skin.knobFaceGradient}
+      />
+
+      <Knob
+        label="FB"
+        min={0}
+        max={100}
+        value={phaserFeedback * 100}
+        onChange={(v) => {
+          setPhaserFeedback(v / 100);
+          markCustom();
+        }}
+        display={`${Math.round(phaserFeedback * 100)}%`}
+        labelColor="#f9fafb"
+        valueColor="#e5e7eb"
+        faceGradient={skin.knobFaceGradient}
+      />
+
+      <Knob
+        label="Mix"
+        min={0}
+        max={100}
+        value={phaserMix * 100}
+        onChange={(v) => {
+          setPhaserMix(v / 100);
+          markCustom();
+        }}
+        display={`${Math.round(phaserMix * 100)}%`}
+        labelColor="#f9fafb"
+        valueColor="#e5e7eb"
+        faceGradient={skin.knobFaceGradient}
+      />
+
+      <Knob
+        label="Center"
+        min={0}
+        max={100}
+        value={phaserCenter * 100}
+        onChange={(v) => {
+          setPhaserCenter(v / 100);
+          markCustom();
+        }}
+        display={`${Math.round(phaserCenter * 100)}%`}
+        labelColor="#f9fafb"
+        valueColor="#e5e7eb"
+        faceGradient={skin.knobFaceGradient}
+      />
+    </div>
+  </div>
+
+  <button
+    type="button"
+    onClick={() => {
+      setPhaserEnabled(!phaserEnabled);
+      markCustom();
+    }}
+    style={{
+      padding: '0.55rem 1.4rem',
+      borderRadius: '999px',
+      border: phaserEnabled ? skin.delayOnBorder : skin.delayOffBorder,
+      background: phaserEnabled ? skin.modeActiveBg : 'transparent',
+      color: phaserEnabled ? skin.modeActiveColor : skin.modeInactiveColor,
+      fontSize: '0.7rem',
+      textTransform: 'uppercase',
+      letterSpacing: '0.16em',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.45rem',
+      cursor: 'pointer',
+      boxShadow: phaserEnabled ? skin.controlOnShadow : skin.controlOffShadow,
+    }}
+  >
+    <span
+      style={{
+        width: 10,
+        height: 10,
+        borderRadius: '999px',
+        background: phaserEnabled ? skin.delayOnDotBg : skin.delayOffDotBg,
+      }}
+    />
+    {phaserEnabled ? 'Phaser On' : 'Phaser Off'}
+  </button>
+</div>
+
 
                     {/* --------- PEDAL OCTAVE (prototype) ---------- */}
 <div

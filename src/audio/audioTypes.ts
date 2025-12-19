@@ -138,6 +138,21 @@ setValveLevel: (v: number) => void;
   setFlangerFeedback: (v: number) => void;
   flangerMix: number;
   setFlangerMix: (v: number) => void;
+
+    // ✅ Phaser
+  phaserEnabled: boolean;
+  setPhaserEnabled: (v: boolean) => void;
+  phaserRate: number;        // 0..1
+  setPhaserRate: (v: number) => void;
+  phaserDepth: number;       // 0..1
+  setPhaserDepth: (v: number) => void;
+  phaserFeedback: number;    // 0..1
+  setPhaserFeedback: (v: number) => void;
+  phaserMix: number;         // 0..1
+  setPhaserMix: (v: number) => void;
+  phaserCenter: number;      // 0..1
+  setPhaserCenter: (v: number) => void;
+
   // Acciones
   setupGuitarInput: () => Promise<void>;
   loadBackingFile: (file: File) => Promise<void>;
