@@ -72,7 +72,10 @@ export type AudioEngineContextValue = {
   // Delay bypass
   delayEnabled: boolean;
   setDelayEnabled: (value: boolean) => void;
-
+octaveTone: number;
+setOctaveTone: (v: number) => void;
+octaveLevel: number;
+setOctaveLevel: (v: number) => void;
   ragaEnabled: boolean;
 setRagaEnabled: (value: boolean) => void;
 ragaResonance: number;
@@ -99,7 +102,11 @@ setRagaColor: (value: number) => void;
   // Reverb
   reverbAmount: number; // 0..1
   setReverbAmount: (value: number) => void;
-
+  // ✅ Octave (Whammy-ish / sub octave)
+  octaveEnabled: boolean;
+  setOctaveEnabled: (v: boolean) => void;
+  octaveMix: number; // 0..1
+  setOctaveMix: (v: number) => void;
   // Monitor
   monitorEnabled: boolean;
   setMonitorEnabled: (v: boolean) => void;

@@ -453,6 +453,15 @@ type SubPanel = 'amp' | 'pedals';
 const AmpPanel: React.FC = () => {
   const {
     // Amp
+    // ✅ Octave
+    octaveTone,
+setOctaveTone,
+octaveLevel,
+setOctaveLevel,
+    octaveEnabled,
+    setOctaveEnabled,
+    octaveMix,
+    setOctaveMix,
     ampGain,
     setAmpGain,
     ampTone,
@@ -1315,6 +1324,124 @@ const AmpPanel: React.FC = () => {
                         {delayEnabled ? 'Delay On' : 'Delay Off'}
                       </button>
                     </div>
+
+                    {/* --------- PEDAL OCTAVE (prototype) ---------- */}
+<div
+  style={{
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.8rem',
+  }}
+>
+  <div
+    style={{
+      position: 'relative',
+      width: 260,
+      height: 420,
+      backgroundImage: `url(${sitarPedalImg})`, // ✅ por ahora reutilizamos el PNG del sitar
+      backgroundSize: 'contain',
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: 'center',
+      display: 'flex',
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+      paddingBottom: '1.4rem',
+    }}
+  >
+    <div
+      style={{
+        display: 'flex',
+        padding: '0.4rem 0.7rem',
+        borderRadius: 999,
+        backdropFilter: 'blur(4px)',
+        background: 'rgba(0,0,0,0.45)',
+        position: 'absolute',
+        top: '255px',
+        gap: '0.5rem',
+      }}
+    >
+      <Knob
+        label="Mix"
+        min={0}
+        max={100}
+        value={octaveMix * 100}
+        onChange={(v) => {
+          setOctaveMix(v / 100);
+          markCustom();
+        }}
+        display={`${Math.round(octaveMix * 100)}%`}
+        labelColor="#f9fafb"
+        valueColor="#e5e7eb"
+        faceGradient={skin.knobFaceGradient}
+      />
+
+      {/* Podés dejar 2 knobs vacíos por ahora (o agregar después Tone/Track) */}
+     <Knob
+  label="Tone"
+  min={0}
+  max={100}
+  value={octaveTone * 100}
+  onChange={(v) => {
+    setOctaveTone(v / 100);
+    markCustom();
+  }}
+  display={`${Math.round(octaveTone * 100)}%`}
+  labelColor="#f9fafb"
+  valueColor="#e5e7eb"
+  faceGradient={skin.knobFaceGradient}
+/>
+
+<Knob
+  label="Level"
+  min={0}
+  max={100}
+  value={octaveLevel * 100}
+  onChange={(v) => {
+    setOctaveLevel(v / 100);
+    markCustom();
+  }}
+  display={`${Math.round(octaveLevel * 100)}%`}
+  labelColor="#f9fafb"
+  valueColor="#e5e7eb"
+  faceGradient={skin.knobFaceGradient}
+/>
+    </div>
+  </div>
+
+  <button
+    type="button"
+    onClick={() => {
+      setOctaveEnabled(!octaveEnabled);
+      markCustom();
+    }}
+    style={{
+      padding: '0.5rem 1.4rem',
+      borderRadius: '999px',
+      border: octaveEnabled ? skin.delayOnBorder : skin.delayOffBorder,
+      background: octaveEnabled ? skin.modeActiveBg : 'transparent',
+      color: octaveEnabled ? skin.modeActiveColor : skin.modeInactiveColor,
+      fontSize: '0.7rem',
+      textTransform: 'uppercase',
+      letterSpacing: '0.16em',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.45rem',
+      cursor: 'pointer',
+      boxShadow: octaveEnabled ? skin.controlOnShadow : skin.controlOffShadow,
+    }}
+  >
+    <span
+      style={{
+        width: 10,
+        height: 10,
+        borderRadius: '999px',
+        background: octaveEnabled ? skin.delayOnDotBg : skin.delayOffDotBg,
+      }}
+    />
+    {octaveEnabled ? 'Octave On' : 'Octave Off'}
+  </button>
+</div>
                      {/* --------- PEDAL FLANGER (RAGA SWEEP) ---------- */}
   <div
     style={{

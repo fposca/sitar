@@ -104,6 +104,11 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [backingName, setBackingName] = useState<string | null>(null);
   const [backingWaveform, setBackingWaveform] = useState<number[] | null>(null);
 
+      // 🎵 Octave pedal
+const [octaveEnabled, setOctaveEnabled] = useState(false);
+const [octaveMix, setOctaveMix] = useState(0.4); // 0..1
+const [octaveAmount, setOctaveAmount] = useState(1); // 1 = +1 octava
+
   const [isInputReady, setIsInputReady] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [status, setStatus] = useState<string>('Esperando...');
@@ -173,6 +178,17 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // Refs para la animación del cursor en el preview offline
   const offlinePreviewStartTimeRef = useRef<number | null>(null);
   const offlinePreviewAnimRef = useRef<number | null>(null);
+  const droneEnvAmountRef = useRef<GainNode | null>(null);
+const droneGainRef = useRef<GainNode | null>(null);
+// Octave pedal refs
+const octaveDryRef = useRef<GainNode | null>(null);
+const octaveWetRef = useRef<GainNode | null>(null);
+const octaveOscRef = useRef<OscillatorNode | null>(null);
+const octaveRingRef = useRef<GainNode | null>(null);
+const octaveModDepthRef = useRef<GainNode | null>(null);
+const octaveToneFilterRef = useRef<BiquadFilterNode | null>(null);
+
+
   // Flanger refs
   const flangerDelayRef = useRef<DelayNode | null>(null);
   const flangerFeedbackRef = useRef<GainNode | null>(null);
@@ -184,6 +200,8 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // Buffer procesado offline
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
   const [processedWaveform, setProcessedWaveform] = useState<number[] | null>(null);
+  const [octaveTone, setOctaveTone] = useState(0.55);  // 0..1
+const [octaveLevel, setOctaveLevel] = useState(0.9); // 0..1
 
   // Volumen de preview offline (0–1)
   const [offlineVolume, setOfflineVolume] = useState(1.0);
@@ -718,10 +736,17 @@ droneEnvLP.frequency.value = 8; // MÁS lento = más cola
 toneFilter.connect(droneRectifier);
 droneRectifier.connect(droneEnvLP);
 const droneEnvAmount = ctx.createGain();
-droneEnvAmount.gain.value = 0.25; // 0.15–0.45 según gusto
+droneEnvAmount.gain.value = 0.0; // arranca cerrado
+droneEnvAmountRef.current = droneEnvAmount;
+
+droneGain.gain.value = 0.0; // arranca cerrado
+droneGainRef.current = droneGain;
+
+droneEnvAmount.connect(droneGain.gain);
+
 
 droneEnvLP.connect(droneEnvAmount);
-droneEnvAmount.connect(droneGain.gain);
+
 // Controla la ganancia del drone
 
 
@@ -749,12 +774,73 @@ droneNoise.start();
     valveLevelGain.gain.value = valveEnabled ? valveLevel : 1.0;
     valveLevelRef.current = valveLevelGain;
 
+
+
     // Re-wire: driveNode -> toneFilter -> valve -> (de ahí sale todo el resto)
   toneFilter.connect(valveShaper);
   valveShaper.connect(valveToneFilter);
     valveToneFilter.connect(valveLevelGain);
 
    preSitarNode = valveLevelGain;
+
+   // ======================================================
+// 🎵 OCTAVE PEDAL (MAIN graph) — ring-mod simple
+// ======================================================
+ // Split dry/wet
+const octaveDry = ctx.createGain();
+octaveDry.gain.value = 1.0;
+octaveDryRef.current = octaveDry;
+
+// “Ring” (audio * osc)
+const octaveRing = ctx.createGain();
+octaveRing.gain.value = 1.0; // el multiplicador real lo maneja octaveRing.gain (modulado)
+octaveRingRef.current = octaveRing;
+
+// Wet gain (level real del octave)
+const octaveWet = ctx.createGain();
+octaveWet.gain.value = 0.0; // arranca apagado, lo prende useEffect
+octaveWetRef.current = octaveWet;
+
+// Tone filter del wet (lowpass)
+const octaveToneFilter = ctx.createBiquadFilter();
+octaveToneFilter.type = 'lowpass';
+octaveToneFilter.frequency.value = 800 + octaveTone * (16000 - 800);
+octaveToneFilterRef.current = octaveToneFilter;
+
+// Oscillator (modulador)
+const octaveOsc = ctx.createOscillator();
+octaveOsc.type = 'sine';
+octaveOsc.frequency.value = 440; // (después lo podemos afinar a gusto)
+octaveOscRef.current = octaveOsc;
+
+// ✅ Mod depth real (este es el “on/off” verdadero)
+const octaveModDepth = ctx.createGain();
+octaveModDepth.gain.value = 0.0; // arranca off
+octaveModDepthRef.current = octaveModDepth;
+
+// Conexión: osc -> modDepth -> ring.gain
+octaveOsc.connect(octaveModDepth);
+octaveModDepth.connect(octaveRing.gain);
+octaveOsc.start();
+
+// Routing: preSitarNode -> dry + ring
+preSitarNode.connect(octaveDry);
+preSitarNode.connect(octaveRing);
+
+// Wet chain: ring -> toneFilter -> wetGain
+octaveRing.connect(octaveToneFilter);
+octaveToneFilter.connect(octaveWet);
+
+// Mix out: dry + wet -> octaveOut
+const octaveOut = ctx.createGain();
+octaveDry.connect(octaveOut);
+octaveWet.connect(octaveOut);
+
+// Desde ahora, el flujo sigue desde octaveOut
+preSitarNode = octaveOut;
+
+
+
 
 // === FLANGER (Raga Sweep) ===
 // Lo armamos acá para que afecte tanto señal dry como sitar antes del delay principal
@@ -793,6 +879,7 @@ flangerLfoGainRef.current = flangerLFOGain;
 flangerLFO.connect(flangerLFOGain);
 flangerLFOGain.connect(flangerDelay.delayTime);
 flangerLFO.start();
+
 
 // routing flanger: in -> dry + delay -> wet -> out
 const flangerOut = ctx.createGain();
@@ -1052,6 +1139,49 @@ sitarWetGain.connect(preDelayGain);
         src.connect(inputGain);
         inputGain.connect(driveNode);
         driveNode.connect(toneFilter);
+ 
+// ======================================================
+// 🎵 OCTAVE PEDAL (OFFLINE) — usar offlineCtx
+// ======================================================
+const octaveDry = offlineCtx.createGain();
+const octaveRing = offlineCtx.createGain();
+octaveDry.gain.value = 1.0;
+octaveRing.gain.value = 0.0;
+
+const octaveOsc = offlineCtx.createOscillator();
+octaveOsc.type = 'sine';
+octaveOsc.frequency.value = 880;
+octaveOsc.start();
+
+// toneFilter -> dry + ring
+toneFilter.connect(octaveDry);
+toneFilter.connect(octaveRing);
+octaveOsc.connect(octaveRing.gain);
+
+// mix out
+const octaveOut = offlineCtx.createGain();
+octaveDry.connect(octaveOut);
+octaveRing.connect(octaveOut);
+
+// y a partir de acá seguís con octaveOut en vez de toneFilter:
+const preSitar = octaveOut;
+
+
+
+// // Conexiones
+// toneFilter.connect(octaveDry);
+// toneFilter.connect(octaveRing);
+
+// octaveOsc.connect(octaveRing.gain);
+
+// // Mix
+// const octaveOut = ctx.createGain();
+// octaveDry.connect(octaveOut);
+// octaveRing.connect(octaveOut);
+
+// // Desde ahora, preSitarNode sale de octaveOut
+// preSitarNode = octaveOut;
+
 
         // sitar dry
         toneFilter.connect(sitarDryGain);
@@ -1168,6 +1298,91 @@ sitarWetGain.connect(preDelayGain);
       recordGainRef.current.connect(destNode);
     }
   }, [audioContext]);
+  useEffect(() => {
+  if (!audioContext) return;
+  const env = droneEnvAmountRef.current;
+  const g = droneGainRef.current;
+  if (!env || !g) return;
+
+  const t = audioContext.currentTime;
+
+  if (!ragaEnabled || ragaDroneLevel <= 0.001) {
+    env.gain.setTargetAtTime(0, t, 0.03);
+    g.gain.setTargetAtTime(0, t, 0.03);
+    return;
+  }
+
+  // cuánto abre la envolvente (subí/bajá a gusto)
+  env.gain.setTargetAtTime(0.35 * ragaDroneLevel, t, 0.03);
+}, [audioContext, ragaEnabled, ragaDroneLevel]);
+useEffect(() => {
+  if (!audioContext) return;
+
+  const t = audioContext.currentTime;
+  const dry = octaveDryRef.current;
+  const ring = octaveRingRef.current;
+  // si lo pasás a ref real:
+  const modDepth = (octaveModDepthRef as any).current as GainNode | null;
+
+  if (!dry || !ring || !modDepth) return;
+
+  if (!octaveEnabled) {
+    dry.gain.setTargetAtTime(1, t, 0.01);
+    modDepth.gain.setTargetAtTime(0, t, 0.01); // ✅ off real
+    return;
+  }
+
+  dry.gain.setTargetAtTime(1 - octaveMix, t, 0.01);
+  modDepth.gain.setTargetAtTime(octaveMix * 0.8, t, 0.01);
+}, [audioContext, octaveEnabled, octaveMix]);
+
+useEffect(() => {
+  if (!audioContext) return;
+  const f = octaveToneFilterRef.current;
+  if (!f) return;
+
+  const t = audioContext.currentTime;
+  const minF = 800;
+  const maxF = 16000;
+  const freq = minF + octaveTone * (maxF - minF);
+
+  f.frequency.setTargetAtTime(freq, t, 0.01);
+}, [audioContext, octaveTone]);
+useEffect(() => {
+  if (!audioContext) return;
+
+  const wet = octaveWetRef.current;
+  if (!wet) return;
+
+  const t = audioContext.currentTime;
+
+  // wet = (mix * level) cuando está ON, si no 0
+ const targetWet = octaveEnabled
+  ? octaveMix * (0.5 + octaveLevel * 1.5)
+  : 0;
+  wet.gain.setTargetAtTime(targetWet, t, 0.01);
+}, [audioContext, octaveEnabled, octaveMix, octaveLevel]);
+useEffect(() => {
+  if (!audioContext) return;
+
+  const t = audioContext.currentTime;
+  const dry = octaveDryRef.current;
+  const modDepth = octaveModDepthRef.current;
+
+  if (!dry || !modDepth) return;
+
+  if (!octaveEnabled) {
+    dry.gain.setTargetAtTime(1, t, 0.01);
+    modDepth.gain.setTargetAtTime(0, t, 0.01); // OFF real
+    return;
+  }
+
+  dry.gain.setTargetAtTime(1 - octaveMix, t, 0.01);
+
+  // cuánto “muerde” el ring (ajustable)
+ modDepth.gain.setTargetAtTime(octaveMix * 2.0, t, 0.01);
+}, [audioContext, octaveEnabled, octaveMix]);
+
 
 useEffect(() => {
   if (!audioContext) return;
@@ -1811,7 +2026,10 @@ useEffect(() => {
     setSitarAmount,
     sitarMode,
     setSitarMode,
-
+octaveTone,
+setOctaveTone,
+octaveLevel,
+setOctaveLevel,
     // Drive
     driveAmount,
     setDriveAmount,
@@ -1846,7 +2064,11 @@ useEffect(() => {
     offlineVolume,
     setOfflineVolume,
     offlinePreviewProgress,
-
+ // Octave
+    octaveEnabled,
+    setOctaveEnabled,
+    octaveMix,
+    setOctaveMix,
     // Acciones principales
     setupGuitarInput,
     loadBackingFile,
