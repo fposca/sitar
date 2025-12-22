@@ -1,15 +1,16 @@
 // src/components/AmpPanel.tsx
 import React, { useEffect, useState } from 'react';
 import { useAudioEngine, type SitarMode } from '../audio/AudioEngineProvider';
- import type { EngineSettingsV1, CustomPresetV1 } from '../presets/presetSettings';
- import {
-   loadCustomPresets,
-   saveCustomPresets,
-   upsertCustomPreset,
-   deleteCustomPreset,
-   renameCustomPreset,
-   MAX_CUSTOM_PRESETS,
- } from '../presets/presetSettings';
+import LiveWaveform from "./LiveWaveform";
+import type { EngineSettingsV1, CustomPresetV1 } from '../presets/presetSettings';
+import {
+  loadCustomPresets,
+  saveCustomPresets,
+  upsertCustomPreset,
+  deleteCustomPreset,
+  renameCustomPreset,
+  MAX_CUSTOM_PRESETS,
+} from '../presets/presetSettings';
 // CLEAN (rosa)
 import cleanFrontImg from '../assets/nea.png';
 import cleanPanelImg from '../assets/input.png';
@@ -22,8 +23,10 @@ import leadPanelImg from '../assets/input-lead.png';
 import infernalFrontImg from '../assets/nea-infernal.png';
 import infernalPanelImg from '../assets/input-infernal.png';
 import pedalImg from '../assets/pedal.png';
+import pedalPhaser from '../assets/phaser.png';
+import pedalOcta from '../assets/octa.png';
 import distoPedalImg from '../assets/disto.png';
-import sitarPedalImg from '../assets/pedal-sitar.png';
+import pedalRaga from '../assets/raga.png';
 import flangerPedal from '../assets/flanger.png';
 
 
@@ -139,183 +142,183 @@ const PRESETS: Record<
     settings: PresetSettings;
   }
 > = {
- cleanMystic: {
-  label: 'Clean Mystic',
-  description: 'Clean brillante, sitar suave, espacio sagrado.',
-  settings: {
-    ampGain: 0.9,
-    ampTone: 0.55,
-    ampMaster: 1.0,
-    bassAmount: 0.55,
-    midAmount: 0.45,
-    trebleAmount: 0.6,
-    presenceAmount: 0.55,
-    driveAmount: 0.18,
-    driveEnabled: false,
+  cleanMystic: {
+    label: 'Clean Mystic',
+    description: 'Clean brillante, sitar suave, espacio sagrado.',
+    settings: {
+      ampGain: 0.9,
+      ampTone: 0.55,
+      ampMaster: 1.0,
+      bassAmount: 0.55,
+      midAmount: 0.45,
+      trebleAmount: 0.6,
+      presenceAmount: 0.55,
+      driveAmount: 0.18,
+      driveEnabled: false,
 
-    // 🔻 Delay casi imperceptible
-    delayEnabled: true,
-    delayTimeMs: 280,
-    feedbackAmount: 0.12,
-    mixAmount: 0.10,
+      // 🔻 Delay casi imperceptible
+      delayEnabled: true,
+      delayTimeMs: 280,
+      feedbackAmount: 0.12,
+      mixAmount: 0.10,
 
-    reverbAmount: 0.5,
+      reverbAmount: 0.5,
 
-    sitarAmount: 0.35,
-    sitarMode: 'major',
+      sitarAmount: 0.35,
+      sitarMode: 'major',
 
-    // 🌊 Phaser místico
-    phaserEnabled: true,
-    phaserRate: 0.08,
-    phaserDepth: 0.18,
-    phaserFeedback: 0.05,
-    phaserMix: 0.22,
-    phaserCenter: 0.5,
+      // 🌊 Phaser místico
+      phaserEnabled: true,
+      phaserRate: 0.08,
+      phaserDepth: 0.18,
+      phaserFeedback: 0.05,
+      phaserMix: 0.22,
+      phaserCenter: 0.5,
 
-    // 🌫️ Flanger tipo chorus
-    flangerEnabled: true,
-    flangerRate: 0.12,
-    flangerDepth: 0.15,
-    flangerMix: 0.18,
+      // 🌫️ Flanger tipo chorus
+      flangerEnabled: true,
+      flangerRate: 0.12,
+      flangerDepth: 0.15,
+      flangerMix: 0.18,
 
-    // Octave apagado
-    octaveEnabled: false,
-    octaveTone: 0.5,
-    octaveLevel: 1.0,
-    octaveMix: 0.0,
+      // Octave apagado
+      octaveEnabled: false,
+      octaveTone: 0.5,
+      octaveLevel: 1.0,
+      octaveMix: 0.0,
 
-    // Valve apagado
-    valveEnabled: false,
-    valveDrive: 0.35,
-    valveTone: 0.5,
-    valveLevel: 1.0,
-    valveMode: 'overdrive',
+      // Valve apagado
+      valveEnabled: false,
+      valveDrive: 0.35,
+      valveTone: 0.5,
+      valveLevel: 1.0,
+      valveMode: 'overdrive',
 
-    // Raga preparado
-    ragaEnabled: false,
-    ragaResonance: 0.45,
-    ragaDroneLevel: 0.25,
-    ragaColor: 0.5,
+      // Raga preparado
+      ragaEnabled: false,
+      ragaResonance: 0.45,
+      ragaDroneLevel: 0.25,
+      ragaColor: 0.5,
+    },
   },
-},
   desertLead: {
-  label: 'Desert Lead',
-  description: 'Lead vocal, ancho, delay fantasma.',
-  settings: {
-    ampGain: 1.25,
-    ampTone: 0.62,
-    ampMaster: 1.2,
-    bassAmount: 0.5,
-    midAmount: 0.65,
-    trebleAmount: 0.6,
-    presenceAmount: 0.65,
-    driveAmount: 0.58,
-    driveEnabled: true,
+    label: 'Desert Lead',
+    description: 'Lead vocal, ancho, delay fantasma.',
+    settings: {
+      ampGain: 1.25,
+      ampTone: 0.62,
+      ampMaster: 1.2,
+      bassAmount: 0.5,
+      midAmount: 0.65,
+      trebleAmount: 0.6,
+      presenceAmount: 0.65,
+      driveAmount: 0.58,
+      driveEnabled: true,
 
-    // 🔻 Delay mínimo
-    delayEnabled: true,
-    delayTimeMs: 320,
-    feedbackAmount: 0.18,
-    mixAmount: 0.14,
+      // 🔻 Delay mínimo
+      delayEnabled: true,
+      delayTimeMs: 320,
+      feedbackAmount: 0.18,
+      mixAmount: 0.14,
 
-    reverbAmount: 0.4,
+      reverbAmount: 0.4,
 
-    sitarAmount: 0.25,
-    sitarMode: 'sharp',
+      sitarAmount: 0.25,
+      sitarMode: 'sharp',
 
-    // 🌊 Phaser leve
-    phaserEnabled: true,
-    phaserRate: 0.12,
-    phaserDepth: 0.22,
-    phaserFeedback: 0.08,
-    phaserMix: 0.25,
-    phaserCenter: 0.55,
+      // 🌊 Phaser leve
+      phaserEnabled: true,
+      phaserRate: 0.12,
+      phaserDepth: 0.22,
+      phaserFeedback: 0.08,
+      phaserMix: 0.25,
+      phaserCenter: 0.55,
 
-    // 🌫️ Flanger apenas presente
-    flangerEnabled: true,
-    flangerRate: 0.18,
-    flangerDepth: 0.2,
-    flangerMix: 0.2,
+      // 🌫️ Flanger apenas presente
+      flangerEnabled: true,
+      flangerRate: 0.18,
+      flangerDepth: 0.2,
+      flangerMix: 0.2,
 
-    // Octave off
-    octaveEnabled: false,
-    octaveTone: 0.5,
-    octaveLevel: 1.0,
-    octaveMix: 0.0,
+      // Octave off
+      octaveEnabled: false,
+      octaveTone: 0.5,
+      octaveLevel: 1.0,
+      octaveMix: 0.0,
 
-    // Valve listo pero apagado
-    valveEnabled: false,
-    valveDrive: 0.5,
-    valveTone: 0.55,
-    valveLevel: 1.1,
-    valveMode: 'crunch',
+      // Valve listo pero apagado
+      valveEnabled: false,
+      valveDrive: 0.5,
+      valveTone: 0.55,
+      valveLevel: 1.1,
+      valveMode: 'crunch',
 
-    // Raga listo
-    ragaEnabled: false,
-    ragaResonance: 0.4,
-    ragaDroneLevel: 0.3,
-    ragaColor: 0.45,
+      // Raga listo
+      ragaEnabled: false,
+      ragaResonance: 0.4,
+      ragaDroneLevel: 0.3,
+      ragaColor: 0.45,
+    },
   },
-},
- infernalRaga: {
-  label: 'Infernal Raga',
-  description: 'Ritual oscuro, movimiento interno.',
-  settings: {
-    ampGain: 1.5,
-    ampTone: 0.7,
-    ampMaster: 1.3,
-    bassAmount: 0.48,
-    midAmount: 0.6,
-    trebleAmount: 0.75,
-    presenceAmount: 0.8,
-    driveAmount: 0.8,
-    driveEnabled: true,
+  infernalRaga: {
+    label: 'Infernal Raga',
+    description: 'Ritual oscuro, movimiento interno.',
+    settings: {
+      ampGain: 1.5,
+      ampTone: 0.7,
+      ampMaster: 1.3,
+      bassAmount: 0.48,
+      midAmount: 0.6,
+      trebleAmount: 0.75,
+      presenceAmount: 0.8,
+      driveAmount: 0.8,
+      driveEnabled: true,
 
-    // 🔻 Delay casi ambiente
-    delayEnabled: true,
-    delayTimeMs: 360,
-    feedbackAmount: 0.2,
-    mixAmount: 0.16,
+      // 🔻 Delay casi ambiente
+      delayEnabled: true,
+      delayTimeMs: 360,
+      feedbackAmount: 0.2,
+      mixAmount: 0.16,
 
-    reverbAmount: 0.6,
+      reverbAmount: 0.6,
 
-    sitarAmount: 0.6,
-    sitarMode: 'exotic',
+      sitarAmount: 0.6,
+      sitarMode: 'exotic',
 
-    // 🌪️ Phaser profundo
-    phaserEnabled: true,
-    phaserRate: 0.18,
-    phaserDepth: 0.35,
-    phaserFeedback: 0.18,
-    phaserMix: 0.35,
-    phaserCenter: 0.6,
+      // 🌪️ Phaser profundo
+      phaserEnabled: true,
+      phaserRate: 0.18,
+      phaserDepth: 0.35,
+      phaserFeedback: 0.18,
+      phaserMix: 0.35,
+      phaserCenter: 0.6,
 
-    // 🌑 Flanger lento
-    flangerEnabled: true,
-    flangerRate: 0.1,
-    flangerDepth: 0.3,
-    flangerMix: 0.25,
+      // 🌑 Flanger lento
+      flangerEnabled: true,
+      flangerRate: 0.1,
+      flangerDepth: 0.3,
+      flangerMix: 0.25,
 
-    // Octave off
-    octaveEnabled: false,
-    octaveTone: 0.5,
-    octaveLevel: 1.0,
-    octaveMix: 0.0,
+      // Octave off
+      octaveEnabled: false,
+      octaveTone: 0.5,
+      octaveLevel: 1.0,
+      octaveMix: 0.0,
 
-    // Valve preparado
-    valveEnabled: false,
-    valveDrive: 0.65,
-    valveTone: 0.45,
-    valveLevel: 1.15,
-    valveMode: 'distortion',
+      // Valve preparado
+      valveEnabled: false,
+      valveDrive: 0.65,
+      valveTone: 0.45,
+      valveLevel: 1.15,
+      valveMode: 'distortion',
 
-    // Raga poderoso
-    ragaEnabled: false,
-    ragaResonance: 0.65,
-    ragaDroneLevel: 0.45,
-    ragaColor: 0.6,
+      // Raga poderoso
+      ragaEnabled: false,
+      ragaResonance: 0.65,
+      ragaDroneLevel: 0.45,
+      ragaColor: 0.6,
+    },
   },
-},
 };
 
 /* ---------- SKINS VISUALES POR PRESET ---------- */
@@ -423,7 +426,7 @@ const SKINS: Record<
 
     driveOnBg: '#fe98d1',
     driveOffBg: '#d3d3d3ff',
-    driveTextColor: '#f9fafb',
+    driveTextColor: '#050505ff',
 
     // delay verde clásico en el clean
     delayOnBg:
@@ -610,8 +613,7 @@ const AmpPanel: React.FC = () => {
     reverbAmount,
     setReverbAmount,
     // Monitor
-    monitorEnabled,
-    setMonitorEnabled,
+
     // Tonestack
     bassAmount,
     setBassAmount,
@@ -651,8 +653,11 @@ const AmpPanel: React.FC = () => {
     setPhaserMix,
     phaserCenter,
     setPhaserCenter,
-     applySettings,
-     getCurrentSettings,
+    applySettings,
+    getCurrentSettings,
+    monitorEnabled,
+    setMonitorEnabled,
+    getAnalyserNode,
   } = useAudioEngine();
   // const { applySettings } = useAudioEngine();
 
@@ -661,12 +666,14 @@ const AmpPanel: React.FC = () => {
   );
   const [skinPreset, setSkinPreset] = useState<PresetId>('cleanMystic');
   const [subPanel, setSubPanel] = useState<SubPanel>('amp');
- // ✅ Custom presets
+  // ✅ Custom presets
   const [customPresets, setCustomPresets] = useState<CustomPresetV1[]>(() =>
     loadCustomPresets(),
   );
   const [customName, setCustomName] = useState('My Preset');
   const [overwriteId, setOverwriteId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+
 
   // persistencia
   useEffect(() => {
@@ -675,11 +682,11 @@ const AmpPanel: React.FC = () => {
 
   const applyPreset = (id: PresetId) => {
     const { settings } = PRESETS[id];
-  setSelectedPreset(id);
-  setSkinPreset(id);
-  applySettings(settings);
+    setSelectedPreset(id);
+    setSkinPreset(id);
+    applySettings(settings);
   };
- const canCreateNew = customPresets.length < MAX_CUSTOM_PRESETS;
+  const canCreateNew = customPresets.length < MAX_CUSTOM_PRESETS;
 
   const handleSaveCustom = () => {
     const settings = getCurrentSettings() as unknown as EngineSettingsV1;
@@ -689,8 +696,8 @@ const AmpPanel: React.FC = () => {
       id: overwriteId ?? undefined,
       name,
       settings,
-     uiSkinPreset: skinPreset,
-    uiSubPanel: subPanel,
+      uiSkinPreset: skinPreset,
+      uiSubPanel: subPanel,
     });
 
     setCustomPresets(next);
@@ -729,6 +736,15 @@ const AmpPanel: React.FC = () => {
   };
 
   const skin = SKINS[skinPreset];
+  const waveformColor =
+    skinPreset === 'desertLead'
+      ? '#ff7a18'
+      : skinPreset === 'infernalRaga'
+        ? '#fb37ff'
+        : '#ffffffff';
+
+  const waveformAmplitudePx =
+    skinPreset === 'infernalRaga' ? 32 : skinPreset === 'desertLead' ? 35 : 25;
 
   // colores dinámicos para tabs y pedales
   const tabsActiveBg = skin.driveOnBg;
@@ -824,7 +840,7 @@ const AmpPanel: React.FC = () => {
 
       {/* Cabezál + mesa */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        
+
         {/* Amp head */}
         <div
           style={{
@@ -868,7 +884,7 @@ const AmpPanel: React.FC = () => {
               background: '#020617',
             }}
           >
-            
+
             {/* Rejilla / grill */}
             <div
               style={{
@@ -942,43 +958,120 @@ const AmpPanel: React.FC = () => {
                   );
                 })}
               </div>
-  {/* ✅ Custom Presets (solo en EQUIPO) */}
-                    <div
-                      style={{
-                        marginTop: '0.8rem',
-                        position:'absolute',
-                        top:'329px',
-                        padding: '0.75rem',
-                        borderRadius: 14,
-                        border: '1px solid rgba(148,163,184,0.65)',
-                        background: 'rgba(2,6,23,0.55)',
-                      }}
-                    >
+              {/* ✅ Custom Presets (solo en EQUIPO) */}
+              <div
+                style={{
+                  marginTop: '0.8rem',
+                  position: 'absolute',
+                  top: '501px',
+                  padding: '0.75rem',
+                  borderRadius: 14,
+                  border: '1px solid rgba(148,163,184,0.65)',
+                  background: 'rgba(2,6,23,0.55)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    marginBottom: 8,
+                  }}
+                >
+                  <div style={{ fontSize: '0.72rem', letterSpacing: '0.14em', textTransform: 'uppercase', opacity: 0.85 }}>
+                    Custom Presets
+                  </div>
+                  <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                    {customPresets.length}/{MAX_CUSTOM_PRESETS}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                  <input
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                    placeholder="Nombre"
+                    style={{
+                      flex: 1,
+                      padding: '0.45rem 0.6rem',
+                      borderRadius: 10,
+                      border: '1px solid rgba(148,163,184,0.35)',
+                      background: '#020617',
+                      color: '#e5e7eb',
+                      fontSize: '0.75rem',
+                    }}
+                  />
+
+                  <select
+                    value={overwriteId ?? ''}
+                    onChange={(e) => setOverwriteId(e.target.value || null)}
+                    style={{
+                      padding: '0.45rem 0.55rem',
+                      borderRadius: 10,
+                      border: '1px solid rgba(148,163,184,0.35)',
+                      background: '#020617',
+                      color: '#e5e7eb',
+                      fontSize: '0.72rem',
+                    }}
+                    title="Opcional: sobrescribir"
+                  >
+                    <option value="">Create new</option>
+                    {customPresets.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        Overwrite: {p.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveCustom}
+                    disabled={!canCreateNew && !overwriteId}
+                    style={{
+                      padding: '0.45rem 0.8rem',
+                      borderRadius: 999,
+                      border: '1px solid rgba(148,163,184,0.45)',
+                      background: (!canCreateNew && !overwriteId) ? 'rgba(15,23,42,0.4)' : skin.modeActiveBg,
+                      color: '#fff',
+                      cursor: (!canCreateNew && !overwriteId) ? 'not-allowed' : 'pointer',
+                      fontSize: '0.72rem',
+                      letterSpacing: '0.12em',
+                      textTransform: 'uppercase',
+                      fontWeight: 700,
+                      boxShadow: (!canCreateNew && !overwriteId) ? 'none' : skin.controlOnShadow,
+                    }}
+                    title={!canCreateNew && !overwriteId ? 'Máximo 5. Borrá uno o sobrescribí.' : 'Guardar preset'}
+                  >
+                    Save
+                  </button>
+                </div>
+
+                {customPresets.length === 0 ? (
+                  <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                    No hay presets guardados todavía.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {customPresets.map((p) => (
                       <div
+                        key={p.id}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 10,
-                          marginBottom: 8,
+                          gap: 8,
+                          padding: '0.45rem',
+                          borderRadius: 12,
+                          border: '1px solid rgba(148,163,184,0.25)',
+                          background: 'rgba(2,6,23,0.35)',
                         }}
                       >
-                        <div style={{ fontSize: '0.72rem', letterSpacing: '0.14em', textTransform: 'uppercase', opacity: 0.85 }}>
-                          Custom Presets
-                        </div>
-                        <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>
-                          {customPresets.length}/{MAX_CUSTOM_PRESETS}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
                         <input
-                          value={customName}
-                          onChange={(e) => setCustomName(e.target.value)}
-                          placeholder="Nombre"
+                          value={p.name}
+                          onChange={(e) => handleRenameCustom(p.id, e.target.value)}
                           style={{
                             flex: 1,
-                            padding: '0.45rem 0.6rem',
+                            padding: '0.4rem 0.55rem',
                             borderRadius: 10,
                             border: '1px solid rgba(148,163,184,0.35)',
                             background: '#020617',
@@ -987,128 +1080,162 @@ const AmpPanel: React.FC = () => {
                           }}
                         />
 
-                        <select
-                          value={overwriteId ?? ''}
-                          onChange={(e) => setOverwriteId(e.target.value || null)}
-                          style={{
-                            padding: '0.45rem 0.55rem',
-                            borderRadius: 10,
-                            border: '1px solid rgba(148,163,184,0.35)',
-                            background: '#020617',
-                            color: '#e5e7eb',
-                            fontSize: '0.72rem',
-                          }}
-                          title="Opcional: sobrescribir"
-                        >
-                          <option value="">Create new</option>
-                          {customPresets.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              Overwrite: {p.name}
-                            </option>
-                          ))}
-                        </select>
-
                         <button
                           type="button"
-                          onClick={handleSaveCustom}
-                          disabled={!canCreateNew && !overwriteId}
+                          onClick={() => handleLoadCustom(p.id)}
                           style={{
-                            padding: '0.45rem 0.8rem',
+                            padding: '0.38rem 0.7rem',
                             borderRadius: 999,
                             border: '1px solid rgba(148,163,184,0.45)',
-                            background: (!canCreateNew && !overwriteId) ? 'rgba(15,23,42,0.4)' : skin.modeActiveBg,
-                            color: '#fff',
-                            cursor: (!canCreateNew && !overwriteId) ? 'not-allowed' : 'pointer',
+                            background: 'rgba(2,6,23,0.35)',
+                            color: '#e5e7eb',
+                            cursor: 'pointer',
                             fontSize: '0.72rem',
                             letterSpacing: '0.12em',
                             textTransform: 'uppercase',
                             fontWeight: 700,
-                            boxShadow: (!canCreateNew && !overwriteId) ? 'none' : skin.controlOnShadow,
                           }}
-                          title={!canCreateNew && !overwriteId ? 'Máximo 5. Borrá uno o sobrescribí.' : 'Guardar preset'}
                         >
-                          Save
+                          Load
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDelete({ id: p.id, name: p.name })}
+                          style={{
+                            padding: '0.38rem 0.7rem',
+                            borderRadius: 999,
+                            border: '1px solid rgba(248,113,113,0.65)',
+                            background: 'transparent',
+                            color: '#fecaca',
+                            cursor: 'pointer',
+                            fontSize: '0.72rem',
+                            letterSpacing: '0.12em',
+                            textTransform: 'uppercase',
+                            fontWeight: 700,
+                          }}
+                        >
+                          Delete
                         </button>
                       </div>
-
-                      {customPresets.length === 0 ? (
-                        <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>
-                          No hay presets guardados todavía.
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {customPresets.map((p) => (
-                            <div
-                              key={p.id}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                padding: '0.45rem',
-                                borderRadius: 12,
-                                border: '1px solid rgba(148,163,184,0.25)',
-                                background: 'rgba(2,6,23,0.35)',
-                              }}
-                            >
-                              <input
-                                value={p.name}
-                                onChange={(e) => handleRenameCustom(p.id, e.target.value)}
-                                style={{
-                                  flex: 1,
-                                  padding: '0.4rem 0.55rem',
-                                  borderRadius: 10,
-                                  border: '1px solid rgba(148,163,184,0.35)',
-                                  background: '#020617',
-                                  color: '#e5e7eb',
-                                  fontSize: '0.75rem',
-                                }}
-                              />
-
-                              <button
-                                type="button"
-                                onClick={() => handleLoadCustom(p.id)}
-                                style={{
-                                  padding: '0.38rem 0.7rem',
-                                  borderRadius: 999,
-                                  border: '1px solid rgba(148,163,184,0.45)',
-                                  background: 'rgba(2,6,23,0.35)',
-                                  color: '#e5e7eb',
-                                  cursor: 'pointer',
-                                  fontSize: '0.72rem',
-                                  letterSpacing: '0.12em',
-                                  textTransform: 'uppercase',
-                                  fontWeight: 700,
-                                }}
-                              >
-                                Load
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteCustom(p.id)}
-                                style={{
-                                  padding: '0.38rem 0.7rem',
-                                  borderRadius: 999,
-                                  border: '1px solid rgba(248,113,113,0.65)',
-                                  background: 'transparent',
-                                  color: '#fecaca',
-                                  cursor: 'pointer',
-                                  fontSize: '0.72rem',
-                                  letterSpacing: '0.12em',
-                                  textTransform: 'uppercase',
-                                  fontWeight: 700,
-                                }}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               {/* ---------- PANEL EQUIPO ---------- */}
               {subPanel === 'amp' && (
                 <>
+                  <div style={{ position: 'absolute', top: '998px', left: '1564px', width: '211px' }}>
+                    <LiveWaveform
+                      analyser={getAnalyserNode()}
+                      enabled={monitorEnabled}
+                      height={42}
+                      color={waveformColor}
+                      glow={10}
+                      fillAlpha={0.16}
+                      amplitudePx={waveformAmplitudePx}
+                    />
+                    {/* 👇👇👇 ACÁ VA EL MODAL, AL FINAL */}
+                    {confirmDelete && (
+                      <div
+                        style={{
+                          position: 'fixed',
+                          inset: 0,
+                          background: 'rgba(0,0,0,0.55)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 9999,
+                          padding: 16,
+                        }}
+                        onClick={() => setConfirmDelete(null)}
+                      >
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            width: 'min(520px, 92vw)',
+                            borderRadius: 18,
+                            border: '1px solid rgba(148,163,184,0.35)',
+                            background: 'rgba(2,6,23,0.92)',
+                            boxShadow: '0 30px 80px rgba(0,0,0,0.7)',
+                            padding: '14px 14px 12px',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', opacity: 0.75 }}>
+                            Confirmación
+                          </div>
+
+                          <div style={{ marginTop: 8, fontSize: '1rem', fontWeight: 800 }}>
+                            ¿Querés borrar este preset?
+                          </div>
+
+                          <div style={{ marginTop: 6, fontSize: '0.85rem', opacity: 0.85 }}>
+                            Preset: <b>{confirmDelete.name}</b>
+                          </div>
+                          <div style={{ marginTop: 16, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                            {/* Cancelar */}
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDelete(null)}
+                              style={{
+                                padding: '0.52rem 0.95rem',
+                                borderRadius: 999,
+                                border: '1px solid rgba(148,163,184,0.45)',
+                                background: 'rgba(2,6,23,0.35)',
+                                color: '#e5e7eb',
+                                cursor: 'pointer',
+                                fontSize: '0.72rem',
+                                letterSpacing: '0.14em',
+                                textTransform: 'uppercase',
+                                fontWeight: 900,
+                                backdropFilter: 'blur(6px)',
+                                boxShadow: '0 10px 26px rgba(0,0,0,0.35)',
+                                transition: 'transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease',
+                              }}
+                              onMouseDown={(e) => (e.currentTarget.style.transform = 'translateY(1px)')}
+                              onMouseUp={(e) => (e.currentTarget.style.transform = 'translateY(0px)')}
+                              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.95')}
+                              onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                            >
+                              Cancelar
+                            </button>
+
+                            {/* Borrar */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleDeleteCustom(confirmDelete.id);
+                                setConfirmDelete(null);
+                              }}
+                              style={{
+                                padding: '0.52rem 0.95rem',
+                                borderRadius: 999,
+                                border: `1px solid rgba(255,255,255,0.18)`,
+                                background: skin.modeActiveBg,          // 👈 usa el color del preset actual
+                                color: skin.modeActiveColor,            // 👈 texto acorde
+                                cursor: 'pointer',
+                                fontSize: '0.72rem',
+                                letterSpacing: '0.14em',
+                                textTransform: 'uppercase',
+                                fontWeight: 950,
+                                boxShadow: skin.controlOnShadow,        // 👈 glow acorde al preset
+                                transition: 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease',
+                                filter: 'saturate(1.05)',
+                              }}
+                              onMouseDown={(e) => (e.currentTarget.style.transform = 'translateY(1px)')}
+                              onMouseUp={(e) => (e.currentTarget.style.transform = 'translateY(0px)')}
+                              onMouseEnter={(e) => (e.currentTarget.style.filter = 'saturate(1.25)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.filter = 'saturate(1.05)')}
+                            >
+                              Borrar
+                            </button>
+                          </div>
+
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Preset + logo + switches (Monitor / Drive) */}
                   <div
                     style={{
@@ -1198,8 +1325,8 @@ const AmpPanel: React.FC = () => {
                       </div>
 
 
-                  
-                      
+
+
                     </div>
 
                     {/* NB • SITAR badge */}
@@ -1257,31 +1384,88 @@ const AmpPanel: React.FC = () => {
                     </button>
 
                     {/* Drive ON/OFF */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDriveEnabled(!driveEnabled);
-                        markCustom();
-                      }}
+                    <div
                       style={{
-                        padding: '0.55rem 1.4rem',
-                        borderRadius: '999px',
-                        border: 'none',
-                        fontSize: '0.7rem',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.16em',
-                        background: driveEnabled
-                          ? skin.driveOnBg
-                          : skin.driveOffBg,
-                        color: skin.driveTextColor,
-                        cursor: 'pointer',
-                        boxShadow: driveEnabled
-                          ? skin.controlOnShadow
-                          : skin.controlOffShadow,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.55rem',
+                        padding: '0.35rem 0.6rem',
+                        borderRadius: 999,
+                        border: '1px solid rgba(148,163,184,0.35)',
+                        background: 'rgba(2,6,23,0.45)',
                       }}
                     >
-                      {driveEnabled ? 'Drive On' : 'Drive Off'}
-                    </button>
+                      {/* Label */}
+                      <span
+                        style={{
+                          fontSize: '0.65rem',
+                          letterSpacing: '0.18em',
+                          textTransform: 'uppercase',
+                          opacity: 0.85,
+                          color: skin.driveTextColor,
+                        }}
+                      >
+                        Drive
+                      </span>
+
+                      {/* Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDriveEnabled(!driveEnabled);
+                          markCustom();
+                        }}
+                        style={{
+                          position: 'relative',
+                          width: 46,
+                          height: 24,
+                          borderRadius: 999,
+                          border: driveEnabled
+                            ? `1px solid ${skin.driveOnBg}`
+                            : '1px solid rgba(148,163,184,0.45)',
+                          background: driveEnabled
+                            ? skin.driveOnBg
+                            : 'rgba(15,23,42,0.8)',
+                          cursor: 'pointer',
+                          boxShadow: driveEnabled
+                            ? skin.controlOnShadow
+                            : 'inset 0 0 0 1px rgba(0,0,0,0.25)',
+                          transition: 'all 160ms ease',
+                        }}
+                      >
+                        {/* Thumb */}
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: 2,
+                            left: driveEnabled ? 24 : 2,
+                            width: 18,
+                            height: 18,
+                            borderRadius: '50%',
+                            background: '#f9fafb',
+                            boxShadow: driveEnabled
+                              ? '0 0 10px rgba(255,255,255,0.75)'
+                              : '0 2px 6px rgba(0,0,0,0.45)',
+                            transition: 'left 160ms ease, box-shadow 160ms ease',
+                          }}
+                        />
+                      </button>
+
+                      {/* Estado */}
+                      <span
+                        style={{
+                          fontSize: '0.6rem',
+                          letterSpacing: '0.14em',
+                          textTransform: 'uppercase',
+                          fontWeight: 800,
+                          opacity: driveEnabled ? 1 : 0.55,
+                          color: driveEnabled ? skin.driveTextColor : '#9ca3af',
+                        }}
+                      >
+                        {driveEnabled ? 'ON' : 'OFF'}
+                      </span>
+                    </div>
+
                   </div>
 
                   {/* Modos de sitar */}
@@ -1658,7 +1842,7 @@ const AmpPanel: React.FC = () => {
                           position: 'relative',
                           width: 260,
                           height: 420,
-                          backgroundImage: `url(${pedalImg})`,
+                          backgroundImage: `url(${pedalPhaser})`,
                           backgroundSize: 'contain',
                           backgroundRepeat: 'no-repeat',
                           backgroundPosition: 'center',
@@ -1806,7 +1990,7 @@ const AmpPanel: React.FC = () => {
                           position: 'relative',
                           width: 260,
                           height: 420,
-                          backgroundImage: `url(${sitarPedalImg})`, // ✅ por ahora reutilizamos el PNG del sitar
+                          backgroundImage: `url(${pedalOcta})`, // ✅ por ahora reutilizamos el PNG del sitar
                           backgroundSize: 'contain',
                           backgroundRepeat: 'no-repeat',
                           backgroundPosition: 'center',
@@ -2204,7 +2388,7 @@ const AmpPanel: React.FC = () => {
                           position: 'relative',
                           width: 260,
                           height: 420,
-                          backgroundImage: `url(${sitarPedalImg})`,
+                          backgroundImage: `url(${pedalRaga})`,
                           backgroundSize: 'contain',
                           backgroundRepeat: 'no-repeat',
                           backgroundPosition: 'center',
@@ -2327,6 +2511,7 @@ const AmpPanel: React.FC = () => {
           </div>
         </div>
       </div>
+
     </section>
   );
 };

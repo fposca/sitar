@@ -63,6 +63,8 @@ export type AudioEngineContextValue = {
   // ✅ Presets (aplicar / leer settings en un solo punto)
   getCurrentSettings: () => EngineSettings;
   applySettings: (settings: EngineSettings) => void;
+  getAnalyserNode: () => AnalyserNode | null;
+
 
   // 🔹 Metronome
   bpm: number;

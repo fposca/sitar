@@ -136,7 +136,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [valveTone, setValveTone] = useState(0.6);    // brillo
   const [valveLevel, setValveLevel] = useState(0.9);  // volumen pedal
   const [valveMode, setValveMode] =
-  useState<'overdrive' | 'crunch' | 'distortion'>('crunch');
+    useState<'overdrive' | 'crunch' | 'distortion'>('crunch');
 
   // ✅ Flanger (Raga Sweep)
   const [flangerEnabled, setFlangerEnabled] = useState(false);
@@ -186,7 +186,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // 🔸 Progreso del preview offline (0..1)
   const [offlinePreviewProgress, setOfflinePreviewProgress] = useState(0);
 
- // ✅ Helpers para presets (base / custom)
+  // ✅ Helpers para presets (base / custom)
   const getCurrentSettings = useCallback((): EngineSettings => {
     return {
       ampGain,
@@ -205,33 +205,33 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       reverbAmount,
       sitarAmount,
       sitarMode,
-       phaserEnabled,
-    phaserRate,
-    phaserDepth,
-    phaserFeedback,
-    phaserMix,
-    phaserCenter,
+      phaserEnabled,
+      phaserRate,
+      phaserDepth,
+      phaserFeedback,
+      phaserMix,
+      phaserCenter,
 
-    flangerEnabled,
-    flangerRate,
-    flangerDepth,
-    flangerMix,
+      flangerEnabled,
+      flangerRate,
+      flangerDepth,
+      flangerMix,
 
-    octaveEnabled,
-    octaveTone,
-    octaveLevel,
-    octaveMix,
+      octaveEnabled,
+      octaveTone,
+      octaveLevel,
+      octaveMix,
 
-    valveEnabled,
-    valveDrive,
-    valveTone,
-    valveLevel,
-    valveMode,
+      valveEnabled,
+      valveDrive,
+      valveTone,
+      valveLevel,
+      valveMode,
 
-    ragaEnabled,
-    ragaResonance,
-    ragaDroneLevel,
-    ragaColor,
+      ragaEnabled,
+      ragaResonance,
+      ragaDroneLevel,
+      ragaColor,
     };
   }, [
     ampGain,
@@ -249,33 +249,33 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     mixAmount,
     reverbAmount,
     sitarAmount,
-   sitarMode,
-   phaserEnabled,
-  phaserRate,
-  phaserDepth,
-  phaserFeedback,
-  phaserMix,
-  phaserCenter,
+    sitarMode,
+    phaserEnabled,
+    phaserRate,
+    phaserDepth,
+    phaserFeedback,
+    phaserMix,
+    phaserCenter,
 
-  flangerEnabled,
-  flangerRate,
-  flangerDepth,
-  flangerMix,
+    flangerEnabled,
+    flangerRate,
+    flangerDepth,
+    flangerMix,
 
-  octaveEnabled,
+    octaveEnabled,
 
-  octaveMix,
+    octaveMix,
 
-  valveEnabled,
-  valveDrive,
-  valveTone,
-  valveLevel,
-  valveMode,
+    valveEnabled,
+    valveDrive,
+    valveTone,
+    valveLevel,
+    valveMode,
 
-  ragaEnabled,
-  ragaResonance,
-  ragaDroneLevel,
-  ragaColor,
+    ragaEnabled,
+    ragaResonance,
+    ragaDroneLevel,
+    ragaColor,
   ]);
 
   const applySettings = useCallback((s: EngineSettings) => {
@@ -303,37 +303,37 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     setSitarMode(s.sitarMode);
 
     // ✅ Phaser
-  setPhaserEnabled(s.phaserEnabled);
-  setPhaserRate(s.phaserRate);
-  setPhaserDepth(s.phaserDepth);
-  setPhaserFeedback(s.phaserFeedback);
-  setPhaserMix(s.phaserMix);
-  setPhaserCenter(s.phaserCenter);
+    setPhaserEnabled(s.phaserEnabled);
+    setPhaserRate(s.phaserRate);
+    setPhaserDepth(s.phaserDepth);
+    setPhaserFeedback(s.phaserFeedback);
+    setPhaserMix(s.phaserMix);
+    setPhaserCenter(s.phaserCenter);
 
-  // ✅ Flanger
-  setFlangerEnabled(s.flangerEnabled);
-  setFlangerRate(s.flangerRate);
-  setFlangerDepth(s.flangerDepth);
-  setFlangerMix(s.flangerMix);
+    // ✅ Flanger
+    setFlangerEnabled(s.flangerEnabled);
+    setFlangerRate(s.flangerRate);
+    setFlangerDepth(s.flangerDepth);
+    setFlangerMix(s.flangerMix);
 
-  // ✅ Octave
-  setOctaveEnabled(s.octaveEnabled);
-  setOctaveTone(s.octaveTone);
-  setOctaveLevel(s.octaveLevel);
-  setOctaveMix(s.octaveMix);
+    // ✅ Octave
+    setOctaveEnabled(s.octaveEnabled);
+    setOctaveTone(s.octaveTone);
+    setOctaveLevel(s.octaveLevel);
+    setOctaveMix(s.octaveMix);
 
-  // ✅ Valve
-  setValveEnabled(s.valveEnabled);
-  setValveDrive(s.valveDrive);
-  setValveTone(s.valveTone);
-  setValveLevel(s.valveLevel);
-  setValveMode(s.valveMode);
+    // ✅ Valve
+    setValveEnabled(s.valveEnabled);
+    setValveDrive(s.valveDrive);
+    setValveTone(s.valveTone);
+    setValveLevel(s.valveLevel);
+    setValveMode(s.valveMode);
 
-  // ✅ Raga
-  setRagaEnabled(s.ragaEnabled);
-  setRagaResonance(s.ragaResonance);
-  setRagaDroneLevel(s.ragaDroneLevel);
-  setRagaColor(s.ragaColor);
+    // ✅ Raga
+    setRagaEnabled(s.ragaEnabled);
+    setRagaResonance(s.ragaResonance);
+    setRagaDroneLevel(s.ragaDroneLevel);
+    setRagaColor(s.ragaColor);
   }, []);
 
 
@@ -344,7 +344,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const droneGainRef = useRef<GainNode | null>(null);
 
   const valveDryRef = useRef<GainNode | null>(null);
-const valveWetRef = useRef<GainNode | null>(null);
+  const valveWetRef = useRef<GainNode | null>(null);
   // Octave pedal refs
   const octaveDryRef = useRef<GainNode | null>(null);
   const octaveWetRef = useRef<GainNode | null>(null);
@@ -360,6 +360,9 @@ const valveWetRef = useRef<GainNode | null>(null);
   const phaserFeedbackRef = useRef<GainNode | null>(null);
   const phaserLfoRef = useRef<OscillatorNode | null>(null);
   const phaserLfoGainRef = useRef<GainNode | null>(null);
+
+  // Waveform / analyser (para UI)
+  const analyserRef = useRef<AnalyserNode | null>(null);
 
   // Flanger refs
   const flangerDelayRef = useRef<DelayNode | null>(null);
@@ -475,7 +478,7 @@ const valveWetRef = useRef<GainNode | null>(null);
     setMetronomeOn(false);
   }, []);
 
- 
+
 
   // crear / actualizar intervalo del metrónomo
   useEffect(() => {
@@ -850,7 +853,14 @@ const valveWetRef = useRef<GainNode | null>(null);
 
     const postFxGain = ctx.createGain();
     postFxGainRef.current = postFxGain;
+    // ✅ Analyser para UI (onda en vivo)
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.85;
+    analyserRef.current = analyser;
 
+    // postFxGain -> analyser (solo para medir, no cambia audio)
+    postFxGain.connect(analyser);
 
 
     // === CONNECTIONS PRINCIPALES ===
@@ -938,56 +948,56 @@ const valveWetRef = useRef<GainNode | null>(null);
     // Arrancar ruido
     droneNoise.start();
 
-// === VALVE CRUNCH (true bypass con dry/wet) ===
+    // === VALVE CRUNCH (true bypass con dry/wet) ===
 
-// 1) Wet chain (efecto)
-const valveShaper = ctx.createWaveShaper();
-valveShaper.oversample = '4x';
-valveShaperRef.current = valveShaper;
+    // 1) Wet chain (efecto)
+    const valveShaper = ctx.createWaveShaper();
+    valveShaper.oversample = '4x';
+    valveShaperRef.current = valveShaper;
 
-const valveToneFilter = ctx.createBiquadFilter();
-valveToneFilter.type = 'lowpass';
-valveToneRef.current = valveToneFilter;
+    const valveToneFilter = ctx.createBiquadFilter();
+    valveToneFilter.type = 'lowpass';
+    valveToneRef.current = valveToneFilter;
 
-const valveLevelGain = ctx.createGain();
-valveLevelRef.current = valveLevelGain;
+    const valveLevelGain = ctx.createGain();
+    valveLevelRef.current = valveLevelGain;
 
-// Conexión interna del efecto
-valveShaper.connect(valveToneFilter);
-valveToneFilter.connect(valveLevelGain);
+    // Conexión interna del efecto
+    valveShaper.connect(valveToneFilter);
+    valveToneFilter.connect(valveLevelGain);
 
-// 2) Router dry / wet
-const valveDry = ctx.createGain();
-valveDry.gain.value = 1.0;
+    // 2) Router dry / wet
+    const valveDry = ctx.createGain();
+    valveDry.gain.value = 1.0;
 
-const valveWet = ctx.createGain();
-valveWet.gain.value = 0.0;
+    const valveWet = ctx.createGain();
+    valveWet.gain.value = 0.0;
 
-// Guardar refs para togglear ON/OFF en useEffect
-valveDryRef.current = valveDry;
-valveWetRef.current = valveWet;
+    // Guardar refs para togglear ON/OFF en useEffect
+    valveDryRef.current = valveDry;
+    valveWetRef.current = valveWet;
 
-// 3) Entrada desde toneFilter: se divide a dry y al efecto
-toneFilter.connect(valveDry);
-toneFilter.connect(valveShaper);
+    // 3) Entrada desde toneFilter: se divide a dry y al efecto
+    toneFilter.connect(valveDry);
+    toneFilter.connect(valveShaper);
 
-// salida del efecto entra al wet
-valveLevelGain.connect(valveWet);
+    // salida del efecto entra al wet
+    valveLevelGain.connect(valveWet);
 
-// 4) SUMA (mix out)
-const valveOut = ctx.createGain();
-valveDry.connect(valveOut);
-valveWet.connect(valveOut);
+    // 4) SUMA (mix out)
+    const valveOut = ctx.createGain();
+    valveDry.connect(valveOut);
+    valveWet.connect(valveOut);
 
-// 5) Desde ahora, el grafo sigue desde valveOut
-preSitarNode = valveOut;
+    // 5) Desde ahora, el grafo sigue desde valveOut
+    preSitarNode = valveOut;
 
-// // mix out
-// valveDry.connect(valveOut);
-// valveWet.connect(valveOut);
+    // // mix out
+    // valveDry.connect(valveOut);
+    // valveWet.connect(valveOut);
 
-// // desde ahora, el grafo sigue desde valveOut
-// preSitarNode = valveOut;
+    // // desde ahora, el grafo sigue desde valveOut
+    // preSitarNode = valveOut;
 
     // ======================================================
     // 🎵 OCTAVE PEDAL (MAIN graph) — ring-mod simple
@@ -1299,7 +1309,7 @@ preSitarNode = valveOut;
       setStatus('Error al acceder al micrófono/placa');
     }
   }, [getOrCreateAudioContext, ensureGuitarGraph]);
-
+const getAnalyserNode = useCallback(() => analyserRef.current, []);
   // Cargar backing
   const loadBackingFile = useCallback(
     async (file: File) => {
@@ -1734,7 +1744,7 @@ preSitarNode = valveOut;
     phaserMix,
   ]);
 
-  
+
 
   useEffect(() => {
     if (!audioContext) return;
@@ -2119,44 +2129,44 @@ preSitarNode = valveOut;
     }
   }, [ampGain, audioContext]);
 
- useEffect(() => {
-  if (!audioContext) return;
+  useEffect(() => {
+    if (!audioContext) return;
 
-  // curve
-  if (valveShaperRef.current) {
-    valveShaperRef.current.curve = makeDriveCurve(
-      valveMode,
-      valveEnabled ? valveDrive : 0,
-    );
-  }
-
-  // tone
-  if (valveToneRef.current) {
-    const minF = 800;
-    const maxF = 16000;
-    const f = minF + valveTone * (maxF - minF);
-    valveToneRef.current.frequency.setTargetAtTime(f, audioContext.currentTime, 0.01);
-  }
-
-  // level (solo afecta el wet chain)
-  if (valveLevelRef.current) {
-    valveLevelRef.current.gain.setTargetAtTime(valveLevel, audioContext.currentTime, 0.01);
-  }
-
-  // ✅ TRUE BYPASS (dry/wet router)
-  const dry = valveDryRef.current;
-  const wet = valveWetRef.current;
-  if (dry && wet) {
-    const t = audioContext.currentTime;
-    if (!valveEnabled) {
-      wet.gain.setTargetAtTime(0, t, 0.01);
-      dry.gain.setTargetAtTime(1, t, 0.01);
-    } else {
-      wet.gain.setTargetAtTime(1, t, 0.01);
-      dry.gain.setTargetAtTime(0, t, 0.01);
+    // curve
+    if (valveShaperRef.current) {
+      valveShaperRef.current.curve = makeDriveCurve(
+        valveMode,
+        valveEnabled ? valveDrive : 0,
+      );
     }
-  }
-}, [audioContext, valveEnabled, valveDrive, valveTone, valveLevel, valveMode]);
+
+    // tone
+    if (valveToneRef.current) {
+      const minF = 800;
+      const maxF = 16000;
+      const f = minF + valveTone * (maxF - minF);
+      valveToneRef.current.frequency.setTargetAtTime(f, audioContext.currentTime, 0.01);
+    }
+
+    // level (solo afecta el wet chain)
+    if (valveLevelRef.current) {
+      valveLevelRef.current.gain.setTargetAtTime(valveLevel, audioContext.currentTime, 0.01);
+    }
+
+    // ✅ TRUE BYPASS (dry/wet router)
+    const dry = valveDryRef.current;
+    const wet = valveWetRef.current;
+    if (dry && wet) {
+      const t = audioContext.currentTime;
+      if (!valveEnabled) {
+        wet.gain.setTargetAtTime(0, t, 0.01);
+        dry.gain.setTargetAtTime(1, t, 0.01);
+      } else {
+        wet.gain.setTargetAtTime(1, t, 0.01);
+        dry.gain.setTargetAtTime(0, t, 0.01);
+      }
+    }
+  }, [audioContext, valveEnabled, valveDrive, valveTone, valveLevel, valveMode]);
 
 
   useEffect(() => {
@@ -2302,7 +2312,7 @@ preSitarNode = valveOut;
       const amount = driveEnabled ? driveAmount * 6 : 0;
       driveNodeRef.current.curve = makeDriveCurve(driveMode, driveEnabled ? driveAmount : 0);
     }
-  }, [driveAmount, driveEnabled, audioContext,  driveMode]);
+  }, [driveAmount, driveEnabled, audioContext, driveMode]);
 
   // Reverb amount
   useEffect(() => {
@@ -2371,9 +2381,10 @@ preSitarNode = valveOut;
     isInputReady,
     isRecording,
     hasBacking: !!backingBuffer,
-     // ✅ Presets
-   getCurrentSettings,
+    // ✅ Presets
+    getCurrentSettings,
     applySettings,
+    getAnalyserNode,
     // 🔹 Metronome
     bpm,
     setBpm,
@@ -2382,8 +2393,8 @@ preSitarNode = valveOut;
     stopMetronome,
     metronomeVolume,
     setMetronomeVolume,
-driveMode,
-setDriveMode,
+    driveMode,
+    setDriveMode,
     // 🔹 Volumen del backing
     backingVolume,
     setBackingVolume,
@@ -2512,7 +2523,7 @@ setDriveMode,
     stopRecording,
     recordingSeconds,
     valveMode,
-setValveMode,
+    setValveMode,
   };
 
   return (
