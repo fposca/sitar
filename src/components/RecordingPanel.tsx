@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAudioEngine } from '../audio/AudioEngineProvider';
+import LiveWaveform from './LiveWaveform';
+import LiveBarsWaveform from './LiveBarsWaveform';
 
 const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
@@ -9,6 +11,8 @@ const RecordingPanel: React.FC = () => {
     startPlaybackAndRecording,
     stopRecording,
     recordingSeconds,
+    getAnalyserNode,
+    
   } = useAudioEngine();
 
   const [blinkOn, setBlinkOn] = useState(true);
@@ -74,6 +78,30 @@ const RecordingPanel: React.FC = () => {
           {isRecording ? `REC ${timeLabel}` : 'REC 00:00'}
         </span>
       </div>
+      <div
+  style={{
+    marginBottom: '0.9rem',
+    height: 48,
+    borderRadius: 10,
+    background: 'rgba(2,6,23,0.8)',
+    border: '1px solid rgba(239,68,68,0.35)',
+    boxShadow: isRecording ? '0 0 18px rgba(239,68,68,0.35)' : 'none',
+    display: 'flex',
+    alignItems: 'center',
+    padding: '0 10px',
+    overflow: 'hidden',
+  }}
+>
+  <LiveBarsWaveform
+    analyser={getAnalyserNode()}
+    enabled={isRecording}
+    height={36}
+    bars={44}
+    glow={12}
+    color="#ef4444"
+  />
+</div>
+
 
       <div style={{ display: 'flex', gap: '1rem' }}>
         <button
