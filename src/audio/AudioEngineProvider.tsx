@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import type { AudioEngineContextValue, DriveMode, SitarMode } from './audioTypes';
+import type { AudioEngineContextValue, DriveMode, EngineSettings, SitarMode } from './audioTypes';
 import { applySitarMode, makeDriveCurve, computeWaveform } from './audioDSP';
 
 // Convierte un AudioBuffer en un ArrayBuffer con formato WAV PCM 16-bit
@@ -185,6 +185,157 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
   // 🔸 Progreso del preview offline (0..1)
   const [offlinePreviewProgress, setOfflinePreviewProgress] = useState(0);
+
+ // ✅ Helpers para presets (base / custom)
+  const getCurrentSettings = useCallback((): EngineSettings => {
+    return {
+      ampGain,
+      ampTone,
+      ampMaster,
+      bassAmount,
+      midAmount,
+      trebleAmount,
+      presenceAmount,
+      driveAmount,
+      driveEnabled,
+      delayEnabled,
+      delayTimeMs,
+      feedbackAmount,
+      mixAmount,
+      reverbAmount,
+      sitarAmount,
+      sitarMode,
+       phaserEnabled,
+    phaserRate,
+    phaserDepth,
+    phaserFeedback,
+    phaserMix,
+    phaserCenter,
+
+    flangerEnabled,
+    flangerRate,
+    flangerDepth,
+    flangerMix,
+
+    octaveEnabled,
+    octaveTone,
+    octaveLevel,
+    octaveMix,
+
+    valveEnabled,
+    valveDrive,
+    valveTone,
+    valveLevel,
+    valveMode,
+
+    ragaEnabled,
+    ragaResonance,
+    ragaDroneLevel,
+    ragaColor,
+    };
+  }, [
+    ampGain,
+    ampTone,
+    ampMaster,
+    bassAmount,
+    midAmount,
+    trebleAmount,
+    presenceAmount,
+    driveAmount,
+    driveEnabled,
+    delayEnabled,
+    delayTimeMs,
+    feedbackAmount,
+    mixAmount,
+    reverbAmount,
+    sitarAmount,
+   sitarMode,
+   phaserEnabled,
+  phaserRate,
+  phaserDepth,
+  phaserFeedback,
+  phaserMix,
+  phaserCenter,
+
+  flangerEnabled,
+  flangerRate,
+  flangerDepth,
+  flangerMix,
+
+  octaveEnabled,
+
+  octaveMix,
+
+  valveEnabled,
+  valveDrive,
+  valveTone,
+  valveLevel,
+  valveMode,
+
+  ragaEnabled,
+  ragaResonance,
+  ragaDroneLevel,
+  ragaColor,
+  ]);
+
+  const applySettings = useCallback((s: EngineSettings) => {
+    // 🔹 UI state (React)
+    setAmpGain(s.ampGain);
+    setAmpTone(s.ampTone);
+    setAmpMaster(s.ampMaster);
+
+    setBassAmount(s.bassAmount);
+    setMidAmount(s.midAmount);
+    setTrebleAmount(s.trebleAmount);
+    setPresenceAmount(s.presenceAmount);
+
+    setDriveAmount(s.driveAmount);
+    setDriveEnabled(s.driveEnabled);
+
+    setDelayEnabled(s.delayEnabled);
+    setDelayTimeMs(s.delayTimeMs);
+    setFeedbackAmount(s.feedbackAmount);
+    setMixAmount(s.mixAmount);
+
+    setReverbAmount(s.reverbAmount);
+
+    setSitarAmount(s.sitarAmount);
+    setSitarMode(s.sitarMode);
+
+    // ✅ Phaser
+  setPhaserEnabled(s.phaserEnabled);
+  setPhaserRate(s.phaserRate);
+  setPhaserDepth(s.phaserDepth);
+  setPhaserFeedback(s.phaserFeedback);
+  setPhaserMix(s.phaserMix);
+  setPhaserCenter(s.phaserCenter);
+
+  // ✅ Flanger
+  setFlangerEnabled(s.flangerEnabled);
+  setFlangerRate(s.flangerRate);
+  setFlangerDepth(s.flangerDepth);
+  setFlangerMix(s.flangerMix);
+
+  // ✅ Octave
+  setOctaveEnabled(s.octaveEnabled);
+  setOctaveTone(s.octaveTone);
+  setOctaveLevel(s.octaveLevel);
+  setOctaveMix(s.octaveMix);
+
+  // ✅ Valve
+  setValveEnabled(s.valveEnabled);
+  setValveDrive(s.valveDrive);
+  setValveTone(s.valveTone);
+  setValveLevel(s.valveLevel);
+  setValveMode(s.valveMode);
+
+  // ✅ Raga
+  setRagaEnabled(s.ragaEnabled);
+  setRagaResonance(s.ragaResonance);
+  setRagaDroneLevel(s.ragaDroneLevel);
+  setRagaColor(s.ragaColor);
+  }, []);
+
 
   // Refs para la animación del cursor en el preview offline
   const offlinePreviewStartTimeRef = useRef<number | null>(null);
@@ -2220,7 +2371,9 @@ preSitarNode = valveOut;
     isInputReady,
     isRecording,
     hasBacking: !!backingBuffer,
-
+     // ✅ Presets
+   getCurrentSettings,
+    applySettings,
     // 🔹 Metronome
     bpm,
     setBpm,

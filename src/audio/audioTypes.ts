@@ -2,11 +2,67 @@
 
 export type SitarMode = 'sharp' | 'major' | 'minor' | 'exotic';
 export type DriveMode = 'overdrive' | 'crunch' | 'distortion';
+
+// ✅ Settings “core” para presets (base + custom)
+export type EngineSettings = {
+  ampGain: number;
+  ampTone: number;
+  ampMaster: number;
+  bassAmount: number;
+  midAmount: number;
+  trebleAmount: number;
+  presenceAmount: number;
+  driveAmount: number;
+  driveEnabled: boolean;
+  delayEnabled: boolean;
+  delayTimeMs: number;
+  feedbackAmount: number;
+  mixAmount: number;
+  reverbAmount: number;
+  sitarAmount: number;
+  sitarMode: SitarMode;
+  // ✅ Phaser
+  phaserEnabled: boolean;
+  phaserRate: number;
+  phaserDepth: number;
+  phaserFeedback: number;
+  phaserMix: number;
+  phaserCenter: number;
+
+  // ✅ Flanger
+  flangerEnabled: boolean;
+  flangerRate: number;
+  flangerDepth: number;
+  flangerMix: number;
+
+  // ✅ Octave
+  octaveEnabled: boolean;
+  octaveTone: number;
+  octaveLevel: number;
+  octaveMix: number;
+
+  // ✅ Valve / Disto+
+  valveEnabled: boolean;
+  valveDrive: number;
+  valveTone: number;
+  valveLevel: number;
+  valveMode: DriveMode;
+
+  // ✅ Raga
+  ragaEnabled: boolean;
+  ragaResonance: number;
+  ragaDroneLevel: number;
+  ragaColor: number;
+};
 export type AudioEngineContextValue = {
   status: string;
   isInputReady: boolean;
   isRecording: boolean;
   hasBacking: boolean;
+
+  // ✅ Presets (aplicar / leer settings en un solo punto)
+  getCurrentSettings: () => EngineSettings;
+  applySettings: (settings: EngineSettings) => void;
 
   // 🔹 Metronome
   bpm: number;

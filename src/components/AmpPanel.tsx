@@ -1,7 +1,15 @@
 // src/components/AmpPanel.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAudioEngine, type SitarMode } from '../audio/AudioEngineProvider';
-
+ import type { EngineSettingsV1, CustomPresetV1 } from '../presets/presetSettings';
+ import {
+   loadCustomPresets,
+   saveCustomPresets,
+   upsertCustomPreset,
+   deleteCustomPreset,
+   renameCustomPreset,
+   MAX_CUSTOM_PRESETS,
+ } from '../presets/presetSettings';
 // CLEAN (rosa)
 import cleanFrontImg from '../assets/nea.png';
 import cleanPanelImg from '../assets/input.png';
@@ -121,25 +129,7 @@ const Knob: React.FC<KnobProps> = ({
 
 type PresetId = 'cleanMystic' | 'desertLead' | 'infernalRaga';
 
-type PresetSettings = {
-  ampGain: number;
-  ampTone: number;
-  ampMaster: number;
-  bassAmount: number;
-  midAmount: number;
-  trebleAmount: number;
-  presenceAmount: number;
-  driveAmount: number;
-  driveEnabled: boolean;
-  delayEnabled: boolean;
-  delayTimeMs: number;
-  feedbackAmount: number;
-  mixAmount: number;
-  reverbAmount: number;
-  sitarAmount: number;
-  sitarMode: SitarMode;
-
-};
+type PresetSettings = EngineSettingsV1;
 
 const PRESETS: Record<
   PresetId,
@@ -149,72 +139,183 @@ const PRESETS: Record<
     settings: PresetSettings;
   }
 > = {
-  cleanMystic: {
-    label: 'Clean Mystic',
-    description: 'Clean brillante, sitar suave, espacio amplio.',
-    settings: {
-      ampGain: 0.9,
-      ampTone: 0.55,
-      ampMaster: 1.0,
-      bassAmount: 0.55,
-      midAmount: 0.45,
-      trebleAmount: 0.6,
-      presenceAmount: 0.55,
-      driveAmount: 0.18,
-      driveEnabled: false,
-      delayEnabled: true,
-      delayTimeMs: 380,
-      feedbackAmount: 0.28,
-      mixAmount: 0.32,
-      reverbAmount: 0.5,
-      sitarAmount: 0.35,
-      sitarMode: 'major',
-    },
+ cleanMystic: {
+  label: 'Clean Mystic',
+  description: 'Clean brillante, sitar suave, espacio sagrado.',
+  settings: {
+    ampGain: 0.9,
+    ampTone: 0.55,
+    ampMaster: 1.0,
+    bassAmount: 0.55,
+    midAmount: 0.45,
+    trebleAmount: 0.6,
+    presenceAmount: 0.55,
+    driveAmount: 0.18,
+    driveEnabled: false,
+
+    // 🔻 Delay casi imperceptible
+    delayEnabled: true,
+    delayTimeMs: 280,
+    feedbackAmount: 0.12,
+    mixAmount: 0.10,
+
+    reverbAmount: 0.5,
+
+    sitarAmount: 0.35,
+    sitarMode: 'major',
+
+    // 🌊 Phaser místico
+    phaserEnabled: true,
+    phaserRate: 0.08,
+    phaserDepth: 0.18,
+    phaserFeedback: 0.05,
+    phaserMix: 0.22,
+    phaserCenter: 0.5,
+
+    // 🌫️ Flanger tipo chorus
+    flangerEnabled: true,
+    flangerRate: 0.12,
+    flangerDepth: 0.15,
+    flangerMix: 0.18,
+
+    // Octave apagado
+    octaveEnabled: false,
+    octaveTone: 0.5,
+    octaveLevel: 1.0,
+    octaveMix: 0.0,
+
+    // Valve apagado
+    valveEnabled: false,
+    valveDrive: 0.35,
+    valveTone: 0.5,
+    valveLevel: 1.0,
+    valveMode: 'overdrive',
+
+    // Raga preparado
+    ragaEnabled: false,
+    ragaResonance: 0.45,
+    ragaDroneLevel: 0.25,
+    ragaColor: 0.5,
   },
+},
   desertLead: {
-    label: 'Desert Lead',
-    description: 'Lead vocal, medios adelante, delay cantado.',
-    settings: {
-      ampGain: 1.25,
-      ampTone: 0.62,
-      ampMaster: 1.2,
-      bassAmount: 0.5,
-      midAmount: 0.65,
-      trebleAmount: 0.6,
-      presenceAmount: 0.65,
-      driveAmount: 0.58,
-      driveEnabled: true,
-      delayEnabled: true,
-      delayTimeMs: 460,
-      feedbackAmount: 0.38,
-      mixAmount: 0.42,
-      reverbAmount: 0.4,
-      sitarAmount: 0.25,
-      sitarMode: 'sharp',
-    },
+  label: 'Desert Lead',
+  description: 'Lead vocal, ancho, delay fantasma.',
+  settings: {
+    ampGain: 1.25,
+    ampTone: 0.62,
+    ampMaster: 1.2,
+    bassAmount: 0.5,
+    midAmount: 0.65,
+    trebleAmount: 0.6,
+    presenceAmount: 0.65,
+    driveAmount: 0.58,
+    driveEnabled: true,
+
+    // 🔻 Delay mínimo
+    delayEnabled: true,
+    delayTimeMs: 320,
+    feedbackAmount: 0.18,
+    mixAmount: 0.14,
+
+    reverbAmount: 0.4,
+
+    sitarAmount: 0.25,
+    sitarMode: 'sharp',
+
+    // 🌊 Phaser leve
+    phaserEnabled: true,
+    phaserRate: 0.12,
+    phaserDepth: 0.22,
+    phaserFeedback: 0.08,
+    phaserMix: 0.25,
+    phaserCenter: 0.55,
+
+    // 🌫️ Flanger apenas presente
+    flangerEnabled: true,
+    flangerRate: 0.18,
+    flangerDepth: 0.2,
+    flangerMix: 0.2,
+
+    // Octave off
+    octaveEnabled: false,
+    octaveTone: 0.5,
+    octaveLevel: 1.0,
+    octaveMix: 0.0,
+
+    // Valve listo pero apagado
+    valveEnabled: false,
+    valveDrive: 0.5,
+    valveTone: 0.55,
+    valveLevel: 1.1,
+    valveMode: 'crunch',
+
+    // Raga listo
+    ragaEnabled: false,
+    ragaResonance: 0.4,
+    ragaDroneLevel: 0.3,
+    ragaColor: 0.45,
   },
-  infernalRaga: {
-    label: 'Infernal Raga',
-    description: 'Modo exotic al palo, mucha presencia y cola.',
-    settings: {
-      ampGain: 1.5,
-      ampTone: 0.7,
-      ampMaster: 1.3,
-      bassAmount: 0.48,
-      midAmount: 0.6,
-      trebleAmount: 0.75,
-      presenceAmount: 0.8,
-      driveAmount: 0.8,
-      driveEnabled: true,
-      delayEnabled: true,
-      delayTimeMs: 520,
-      feedbackAmount: 0.45,
-      mixAmount: 0.55,
-      reverbAmount: 0.6,
-      sitarAmount: 0.6,
-      sitarMode: 'exotic',
-    },
+},
+ infernalRaga: {
+  label: 'Infernal Raga',
+  description: 'Ritual oscuro, movimiento interno.',
+  settings: {
+    ampGain: 1.5,
+    ampTone: 0.7,
+    ampMaster: 1.3,
+    bassAmount: 0.48,
+    midAmount: 0.6,
+    trebleAmount: 0.75,
+    presenceAmount: 0.8,
+    driveAmount: 0.8,
+    driveEnabled: true,
+
+    // 🔻 Delay casi ambiente
+    delayEnabled: true,
+    delayTimeMs: 360,
+    feedbackAmount: 0.2,
+    mixAmount: 0.16,
+
+    reverbAmount: 0.6,
+
+    sitarAmount: 0.6,
+    sitarMode: 'exotic',
+
+    // 🌪️ Phaser profundo
+    phaserEnabled: true,
+    phaserRate: 0.18,
+    phaserDepth: 0.35,
+    phaserFeedback: 0.18,
+    phaserMix: 0.35,
+    phaserCenter: 0.6,
+
+    // 🌑 Flanger lento
+    flangerEnabled: true,
+    flangerRate: 0.1,
+    flangerDepth: 0.3,
+    flangerMix: 0.25,
+
+    // Octave off
+    octaveEnabled: false,
+    octaveTone: 0.5,
+    octaveLevel: 1.0,
+    octaveMix: 0.0,
+
+    // Valve preparado
+    valveEnabled: false,
+    valveDrive: 0.65,
+    valveTone: 0.45,
+    valveLevel: 1.15,
+    valveMode: 'distortion',
+
+    // Raga poderoso
+    ragaEnabled: false,
+    ragaResonance: 0.65,
+    ragaDroneLevel: 0.45,
+    ragaColor: 0.6,
   },
+},
 };
 
 /* ---------- SKINS VISUALES POR PRESET ---------- */
@@ -550,46 +651,73 @@ const AmpPanel: React.FC = () => {
     setPhaserMix,
     phaserCenter,
     setPhaserCenter,
+     applySettings,
+     getCurrentSettings,
   } = useAudioEngine();
+  // const { applySettings } = useAudioEngine();
 
-  const [selectedPreset, setSelectedPreset] = useState<PresetId | 'custom'>(
+  const [selectedPreset, setSelectedPreset] = useState<PresetId | 'edited'>(
     'cleanMystic',
   );
   const [skinPreset, setSkinPreset] = useState<PresetId>('cleanMystic');
   const [subPanel, setSubPanel] = useState<SubPanel>('amp');
+ // ✅ Custom presets
+  const [customPresets, setCustomPresets] = useState<CustomPresetV1[]>(() =>
+    loadCustomPresets(),
+  );
+  const [customName, setCustomName] = useState('My Preset');
+  const [overwriteId, setOverwriteId] = useState<string | null>(null);
+
+  // persistencia
+  useEffect(() => {
+    saveCustomPresets(customPresets);
+  }, [customPresets]);
 
   const applyPreset = (id: PresetId) => {
     const { settings } = PRESETS[id];
-    setSelectedPreset(id);
-    setSkinPreset(id);
+  setSelectedPreset(id);
+  setSkinPreset(id);
+  applySettings(settings);
+  };
+ const canCreateNew = customPresets.length < MAX_CUSTOM_PRESETS;
 
-    setAmpGain(settings.ampGain);
-    setAmpTone(settings.ampTone);
-    setAmpMaster(settings.ampMaster);
+  const handleSaveCustom = () => {
+    const settings = getCurrentSettings() as unknown as EngineSettingsV1;
+    const name = customName.trim() || 'Untitled';
 
-    setBassAmount(settings.bassAmount);
-    setMidAmount(settings.midAmount);
-    setTrebleAmount(settings.trebleAmount);
-    setPresenceAmount(settings.presenceAmount);
+    const next = upsertCustomPreset(customPresets, {
+      id: overwriteId ?? undefined,
+      name,
+      settings,
+     uiSkinPreset: skinPreset,
+    uiSubPanel: subPanel,
+    });
 
-    setDriveAmount(settings.driveAmount);
-    setDriveEnabled(settings.driveEnabled);
-
-    setDelayEnabled(settings.delayEnabled);
-    setDelayTimeMs(settings.delayTimeMs);
-    setFeedbackAmount(settings.feedbackAmount);
-    setMixAmount(settings.mixAmount);
-
-    setReverbAmount(settings.reverbAmount);
-
-    setSitarAmount(settings.sitarAmount);
-    setSitarMode(settings.sitarMode);
+    setCustomPresets(next);
+    setOverwriteId(null);
   };
 
+  const handleLoadCustom = (id: string) => {
+    const p = customPresets.find((x) => x.id === id);
+    if (!p) return;
+    applySettings(p.settings);
+    if (p.uiSkinPreset) setSkinPreset(p.uiSkinPreset);
+    if (p.uiSubPanel) setSubPanel(p.uiSubPanel);
+    setSelectedPreset('edited'); // queda como "edited" (o después lo cambiamos a selected custom id)
+  };
+
+  const handleDeleteCustom = (id: string) => {
+    setCustomPresets(deleteCustomPreset(customPresets, id));
+    if (overwriteId === id) setOverwriteId(null);
+  };
+
+  const handleRenameCustom = (id: string, name: string) => {
+    setCustomPresets(renameCustomPreset(customPresets, id, name));
+  };
   const selectedPresetLabel =
-    selectedPreset === 'custom' ? 'Custom' : PRESETS[selectedPreset].label;
+    selectedPreset === 'edited' ? 'Custom' : PRESETS[selectedPreset].label;
   const selectedPresetDescription =
-    selectedPreset === 'custom'
+    selectedPreset === 'edited'
       ? 'Ajuste manual del usuario.'
       : PRESETS[selectedPreset].description;
 
@@ -607,7 +735,7 @@ const AmpPanel: React.FC = () => {
   const tabsActiveColor = skin.driveTextColor;
   const tabsInactiveColor = '#e5e7eb';
 
-  const markCustom = () => setSelectedPreset('custom');
+  const markCustom = () => setSelectedPreset('edited');
 
   return (
     <section
@@ -696,6 +824,7 @@ const AmpPanel: React.FC = () => {
 
       {/* Cabezál + mesa */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        
         {/* Amp head */}
         <div
           style={{
@@ -739,6 +868,7 @@ const AmpPanel: React.FC = () => {
               background: '#020617',
             }}
           >
+            
             {/* Rejilla / grill */}
             <div
               style={{
@@ -812,7 +942,170 @@ const AmpPanel: React.FC = () => {
                   );
                 })}
               </div>
+  {/* ✅ Custom Presets (solo en EQUIPO) */}
+                    <div
+                      style={{
+                        marginTop: '0.8rem',
+                        position:'absolute',
+                        top:'329px',
+                        padding: '0.75rem',
+                        borderRadius: 14,
+                        border: '1px solid rgba(148,163,184,0.65)',
+                        background: 'rgba(2,6,23,0.55)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <div style={{ fontSize: '0.72rem', letterSpacing: '0.14em', textTransform: 'uppercase', opacity: 0.85 }}>
+                          Custom Presets
+                        </div>
+                        <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                          {customPresets.length}/{MAX_CUSTOM_PRESETS}
+                        </div>
+                      </div>
 
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                        <input
+                          value={customName}
+                          onChange={(e) => setCustomName(e.target.value)}
+                          placeholder="Nombre"
+                          style={{
+                            flex: 1,
+                            padding: '0.45rem 0.6rem',
+                            borderRadius: 10,
+                            border: '1px solid rgba(148,163,184,0.35)',
+                            background: '#020617',
+                            color: '#e5e7eb',
+                            fontSize: '0.75rem',
+                          }}
+                        />
+
+                        <select
+                          value={overwriteId ?? ''}
+                          onChange={(e) => setOverwriteId(e.target.value || null)}
+                          style={{
+                            padding: '0.45rem 0.55rem',
+                            borderRadius: 10,
+                            border: '1px solid rgba(148,163,184,0.35)',
+                            background: '#020617',
+                            color: '#e5e7eb',
+                            fontSize: '0.72rem',
+                          }}
+                          title="Opcional: sobrescribir"
+                        >
+                          <option value="">Create new</option>
+                          {customPresets.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              Overwrite: {p.name}
+                            </option>
+                          ))}
+                        </select>
+
+                        <button
+                          type="button"
+                          onClick={handleSaveCustom}
+                          disabled={!canCreateNew && !overwriteId}
+                          style={{
+                            padding: '0.45rem 0.8rem',
+                            borderRadius: 999,
+                            border: '1px solid rgba(148,163,184,0.45)',
+                            background: (!canCreateNew && !overwriteId) ? 'rgba(15,23,42,0.4)' : skin.modeActiveBg,
+                            color: '#fff',
+                            cursor: (!canCreateNew && !overwriteId) ? 'not-allowed' : 'pointer',
+                            fontSize: '0.72rem',
+                            letterSpacing: '0.12em',
+                            textTransform: 'uppercase',
+                            fontWeight: 700,
+                            boxShadow: (!canCreateNew && !overwriteId) ? 'none' : skin.controlOnShadow,
+                          }}
+                          title={!canCreateNew && !overwriteId ? 'Máximo 5. Borrá uno o sobrescribí.' : 'Guardar preset'}
+                        >
+                          Save
+                        </button>
+                      </div>
+
+                      {customPresets.length === 0 ? (
+                        <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                          No hay presets guardados todavía.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {customPresets.map((p) => (
+                            <div
+                              key={p.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '0.45rem',
+                                borderRadius: 12,
+                                border: '1px solid rgba(148,163,184,0.25)',
+                                background: 'rgba(2,6,23,0.35)',
+                              }}
+                            >
+                              <input
+                                value={p.name}
+                                onChange={(e) => handleRenameCustom(p.id, e.target.value)}
+                                style={{
+                                  flex: 1,
+                                  padding: '0.4rem 0.55rem',
+                                  borderRadius: 10,
+                                  border: '1px solid rgba(148,163,184,0.35)',
+                                  background: '#020617',
+                                  color: '#e5e7eb',
+                                  fontSize: '0.75rem',
+                                }}
+                              />
+
+                              <button
+                                type="button"
+                                onClick={() => handleLoadCustom(p.id)}
+                                style={{
+                                  padding: '0.38rem 0.7rem',
+                                  borderRadius: 999,
+                                  border: '1px solid rgba(148,163,184,0.45)',
+                                  background: 'rgba(2,6,23,0.35)',
+                                  color: '#e5e7eb',
+                                  cursor: 'pointer',
+                                  fontSize: '0.72rem',
+                                  letterSpacing: '0.12em',
+                                  textTransform: 'uppercase',
+                                  fontWeight: 700,
+                                }}
+                              >
+                                Load
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCustom(p.id)}
+                                style={{
+                                  padding: '0.38rem 0.7rem',
+                                  borderRadius: 999,
+                                  border: '1px solid rgba(248,113,113,0.65)',
+                                  background: 'transparent',
+                                  color: '#fecaca',
+                                  cursor: 'pointer',
+                                  fontSize: '0.72rem',
+                                  letterSpacing: '0.12em',
+                                  textTransform: 'uppercase',
+                                  fontWeight: 700,
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
               {/* ---------- PANEL EQUIPO ---------- */}
               {subPanel === 'amp' && (
                 <>
@@ -903,6 +1196,10 @@ const AmpPanel: React.FC = () => {
                           );
                         })}
                       </div>
+
+
+                  
+                      
                     </div>
 
                     {/* NB • SITAR badge */}
