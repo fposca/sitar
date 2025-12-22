@@ -456,12 +456,17 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // 🔹 Gain node del backing para poder ajustarlo en vivo
   const backingGainRef = useRef<GainNode | null>(null);
 
-  const getOrCreateAudioContext = useCallback(() => {
-    if (audioContext) return audioContext;
-    const ctx = new AudioContext();
-    setAudioContext(ctx);
-    return ctx;
-  }, [audioContext]);
+const getOrCreateAudioContext = useCallback(() => {
+  if (audioContext) return audioContext;
+
+  const ctx = new AudioContext({
+    latencyHint: 'interactive', // <- clave para evitar saltos
+   // sampleRate: 48000, // opcional (si querés fijarlo)
+  });
+
+  setAudioContext(ctx);
+  return ctx;
+}, [audioContext]);
 
   // 🔹 METRÓNOMO
   const [metronomeOn, setMetronomeOn] = useState(false);
@@ -1922,7 +1927,7 @@ const getAnalyserNode = useCallback(() => analyserRef.current, []);
       backingGainRef.current = backingGain; // lo guardamos para live update
 
       backingSource.connect(backingGain);
-      backingGain.connect(ctx.destination);
+      backingGain.connect(finalMasterGainRef.current ?? ctx.destination);
     } else {
       backingSourceRef.current = null;
     }
@@ -2284,7 +2289,7 @@ const getAnalyserNode = useCallback(() => analyserRef.current, []);
     monitorGainRef.current.gain.setTargetAtTime(
       monitorEnabled ? 1 : 0,
       audioContext.currentTime,
-      0.01,
+      0.05
     );
   }, [monitorEnabled, audioContext]);
 
@@ -2350,7 +2355,7 @@ const getAnalyserNode = useCallback(() => analyserRef.current, []);
       finalMasterGainRef.current.gain.setTargetAtTime(
         masterVolume,
         audioContext.currentTime,
-        0.01,
+        0.03,
       );
     }
   }, [masterVolume, audioContext]);
