@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useAudioEngine } from '../audio/AudioEngineProvider';
-import LiveWaveform from './LiveWaveform';
 import LiveBarsWaveform from './LiveBarsWaveform';
 
 const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);

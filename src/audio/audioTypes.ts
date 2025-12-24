@@ -21,6 +21,17 @@ export type EngineSettings = {
   reverbAmount: number;
   sitarAmount: number;
   sitarMode: SitarMode;
+  // compresor
+  compressorEnabled: boolean;
+  
+  compressorThreshold: number; // dB (-60..0)
+  compressorRatio: number;     // (1..20)
+  compressorAttack: number;    // seconds (0.001..0.2)
+  compressorRelease: number;   // seconds (0.03..1.0)
+  compressorKnee: number;      // dB (0..40)
+  compressorMakeup: number;    // 0..2 (gain)
+  compressorMix: number;       // 0..1 (parallel blend)
+
   // ✅ Phaser
   phaserEnabled: boolean;
   phaserRate: number;
@@ -34,7 +45,7 @@ export type EngineSettings = {
   flangerRate: number;
   flangerDepth: number;
   flangerMix: number;
-
+flangerFeedback: number;
   // ✅ Octave
   octaveEnabled: boolean;
   octaveTone: number;
@@ -108,6 +119,34 @@ export type AudioEngineContextValue = {
   setMixAmount: (value: number) => void;
 valveMode: 'overdrive' | 'crunch' | 'distortion';
 setValveMode: (v: 'overdrive' | 'crunch' | 'distortion') => void;
+
+
+// ✅ Compressor (pedal)
+compressorEnabled: boolean;
+setCompressorEnabled: (v: boolean) => void;
+
+compressorThreshold: number;
+setCompressorThreshold: (v: number) => void;
+
+compressorRatio: number;
+setCompressorRatio: (v: number) => void;
+
+compressorAttack: number;
+setCompressorAttack: (v: number) => void;
+
+compressorRelease: number;
+setCompressorRelease: (v: number) => void;
+
+compressorKnee: number;
+setCompressorKnee: (v: number) => void;
+
+compressorMakeup: number;
+setCompressorMakeup: (v: number) => void;
+
+compressorMix: number;
+setCompressorMix: (v: number) => void;
+
+
   // Controles de ampli
   ampGain: number; // 0..2 aprox
   setAmpGain: (value: number) => void;

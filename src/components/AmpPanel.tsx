@@ -146,6 +146,16 @@ const PRESETS: Record<
     label: 'Clean Mystic',
     description: 'Clean brillante, sitar suave, espacio sagrado.',
     settings: {
+      // ✅ COMPRESSOR (defaults)
+      compressorEnabled: false,
+      compressorThreshold: -18,  // dB
+      compressorRatio: 4,        // 1..20
+      compressorAttack: 0.01,    // seconds
+      compressorRelease: 0.2,    // seconds
+      compressorKnee: 12,        // dB
+      compressorMakeup: 1.0,     // linear gain (1 = 0dB)
+      compressorMix: 1.0,        // 0..1
+
       ampGain: 0.9,
       ampTone: 0.55,
       ampMaster: 1.0,
@@ -176,10 +186,11 @@ const PRESETS: Record<
       phaserCenter: 0.5,
 
       // 🌫️ Flanger tipo chorus
-      flangerEnabled: true,
-      flangerRate: 0.12,
-      flangerDepth: 0.15,
-      flangerMix: 0.18,
+     flangerEnabled: true,
+    flangerRate: 0.12,
+    flangerDepth: 0.15,
+    flangerMix: 0.18,
+    flangerFeedback: 0.0,
 
       // Octave apagado
       octaveEnabled: false,
@@ -205,6 +216,16 @@ const PRESETS: Record<
     label: 'Desert Lead',
     description: 'Lead vocal, ancho, delay fantasma.',
     settings: {
+      // ✅ COMPRESSOR (defaults)
+      compressorEnabled: false,
+      compressorThreshold: -18,  // dB
+      compressorRatio: 4,        // 1..20
+      compressorAttack: 0.01,    // seconds
+      compressorRelease: 0.2,    // seconds
+      compressorKnee: 12,        // dB
+      compressorMakeup: 1.0,     // linear gain (1 = 0dB)
+      compressorMix: 1.0,        // 0..1
+
       ampGain: 1.25,
       ampTone: 0.62,
       ampMaster: 1.2,
@@ -239,6 +260,7 @@ const PRESETS: Record<
       flangerRate: 0.18,
       flangerDepth: 0.2,
       flangerMix: 0.2,
+      flangerFeedback: 0.08,
 
       // Octave off
       octaveEnabled: false,
@@ -264,6 +286,16 @@ const PRESETS: Record<
     label: 'Infernal Raga',
     description: 'Ritual oscuro, movimiento interno.',
     settings: {
+      // ✅ COMPRESSOR (defaults)
+      compressorEnabled: false,
+      compressorThreshold: -18,  // dB
+      compressorRatio: 4,        // 1..20
+      compressorAttack: 0.01,    // seconds
+      compressorRelease: 0.2,    // seconds
+      compressorKnee: 12,        // dB
+      compressorMakeup: 1.0,     // linear gain (1 = 0dB)
+      compressorMix: 1.0,        // 0..1
+
       ampGain: 1.5,
       ampTone: 0.7,
       ampMaster: 1.3,
@@ -298,6 +330,7 @@ const PRESETS: Record<
       flangerRate: 0.1,
       flangerDepth: 0.3,
       flangerMix: 0.25,
+      flangerFeedback: 0.18,
 
       // Octave off
       octaveEnabled: false,
@@ -658,6 +691,24 @@ const AmpPanel: React.FC = () => {
     monitorEnabled,
     setMonitorEnabled,
     getAnalyserNode,
+    // ✅ COMPRESSOR
+    compressorEnabled,
+    setCompressorEnabled,
+    compressorThreshold,
+    setCompressorThreshold,
+    compressorRatio,
+    setCompressorRatio,
+    compressorAttack,
+    setCompressorAttack,
+    compressorRelease,
+    setCompressorRelease,
+    compressorKnee,
+    setCompressorKnee,
+    compressorMakeup,
+    setCompressorMakeup,
+    compressorMix,
+    setCompressorMix,
+
   } = useAudioEngine();
   // const { applySettings } = useAudioEngine();
 
@@ -2370,6 +2421,196 @@ const AmpPanel: React.FC = () => {
                           }}
                         />
                         {valveEnabled ? 'Disto+ On' : 'Disto+ Off'}
+                      </button>
+                    </div>
+                    {/* --------- PEDAL COMPRESSOR ---------- */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.8rem',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: 260,
+                          height: 420,
+                          backgroundImage: `url(${pedalOcta})`,
+                          backgroundSize: 'contain',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'center',
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          justifyContent: 'center',
+                          paddingBottom: '1.4rem',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            padding: '0.4rem 0.7rem',
+                            borderRadius: 999,
+                            backdropFilter: 'blur(4px)',
+                            background: 'rgba(0,0,0,0.45)',
+                            position: 'absolute',
+                            top: '255px',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <Knob
+                            label="Thresh"
+                            min={-60}
+                            max={0}
+                            value={compressorThreshold}
+                            onChange={(v) => {
+                              setCompressorThreshold(v);
+                              markCustom();
+                            }}
+                            display={`${Math.round(compressorThreshold)} dB`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+
+                          <Knob
+                            label="Ratio"
+                            min={1}
+                            max={20}
+                            value={compressorRatio}
+                            onChange={(v) => {
+                              setCompressorRatio(v);
+                              markCustom();
+                            }}
+                            display={`${compressorRatio.toFixed(1)}:1`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+
+                          <Knob
+                            label="Attack"
+                            min={1}
+                            max={80}
+                            value={Math.round(compressorAttack * 1000)}
+                            onChange={(v) => {
+                              setCompressorAttack(v / 1000); // ms -> s
+                              markCustom();
+                            }}
+                            display={`${Math.round(compressorAttack * 1000)} ms`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+
+                          <Knob
+                            label="Release"
+                            min={40}
+                            max={800}
+                            value={Math.round(compressorRelease * 1000)}
+                            onChange={(v) => {
+                              setCompressorRelease(v / 1000); // ms -> s
+                              markCustom();
+                            }}
+                            display={`${Math.round(compressorRelease * 1000)} ms`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+
+                          <Knob
+                            label="Mix"
+                            min={0}
+                            max={100}
+                            value={compressorMix * 100}
+                            onChange={(v) => {
+                              setCompressorMix(v / 100);
+                              markCustom();
+                            }}
+                            display={`${Math.round(compressorMix * 100)}%`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+                        </div>
+
+                        {/* fila 2 knobs (Knee + Makeup) si querés */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            padding: '0.35rem 0.6rem',
+                            borderRadius: 999,
+                            backdropFilter: 'blur(4px)',
+                            background: 'rgba(0,0,0,0.35)',
+                            position: 'absolute',
+                            top: '205px',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <Knob
+                            label="Knee"
+                            min={0}
+                            max={40}
+                            value={compressorKnee}
+                            onChange={(v) => {
+                              setCompressorKnee(v);
+                              markCustom();
+                            }}
+                            display={`${Math.round(compressorKnee)} dB`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+
+                          <Knob
+                            label="Makeup"
+                            min={50}
+                            max={200}
+                            value={compressorMakeup * 100}
+                            onChange={(v) => {
+                              setCompressorMakeup(v / 100);
+                              markCustom();
+                            }}
+                            display={`${compressorMakeup.toFixed(2)}`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCompressorEnabled(!compressorEnabled);
+                          markCustom();
+                        }}
+                        style={{
+                          padding: '0.55rem 1.4rem',
+                          borderRadius: '999px',
+                          border: compressorEnabled ? skin.delayOnBorder : skin.delayOffBorder,
+                          background: compressorEnabled ? skin.modeActiveBg : 'transparent',
+                          color: compressorEnabled ? skin.modeActiveColor : skin.modeInactiveColor,
+                          fontSize: '0.7rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.16em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          cursor: 'pointer',
+                          boxShadow: compressorEnabled ? skin.controlOnShadow : skin.controlOffShadow,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '999px',
+                            background: compressorEnabled ? skin.delayOnDotBg : skin.delayOffDotBg,
+                          }}
+                        />
+                        {compressorEnabled ? 'Comp On' : 'Comp Off'}
                       </button>
                     </div>
 

@@ -104,6 +104,16 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [backingName, setBackingName] = useState<string | null>(null);
   const [backingWaveform, setBackingWaveform] = useState<number[] | null>(null);
   const [driveMode, setDriveMode] = useState<DriveMode>('overdrive');
+  // ✅ Compressor
+  const [compressorEnabled, setCompressorEnabled] = useState(false);
+  const [compressorThreshold, setCompressorThreshold] = useState(-24);
+  const [compressorRatio, setCompressorRatio] = useState(4);
+  const [compressorAttack, setCompressorAttack] = useState(0.01);
+  const [compressorRelease, setCompressorRelease] = useState(0.12);
+  const [compressorKnee, setCompressorKnee] = useState(20);
+  const [compressorMakeup, setCompressorMakeup] = useState(1.0);
+  const [compressorMix, setCompressorMix] = useState(1.0); // 1 = full comp, 0 = dry
+
 
   // ✅ Phaser
   const [phaserEnabled, setPhaserEnabled] = useState(false);
@@ -116,7 +126,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // 🎵 Octave pedal
   const [octaveEnabled, setOctaveEnabled] = useState(false);
   const [octaveMix, setOctaveMix] = useState(0.4); // 0..1
-  const [octaveAmount, setOctaveAmount] = useState(1); // 1 = +1 octava
+   const [octaveTone, setOctaveTone] = useState(0.55);  // 0..1
+  const [octaveLevel, setOctaveLevel] = useState(0.9); // 0..1
+  // const [octaveAmount, setOctaveAmount] = useState(1); // 1 = +1 octava
 
   const [isInputReady, setIsInputReady] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -189,6 +201,15 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // ✅ Helpers para presets (base / custom)
   const getCurrentSettings = useCallback((): EngineSettings => {
     return {
+      compressorEnabled,
+
+  compressorThreshold,
+  compressorRatio,
+  compressorAttack,
+  compressorRelease,
+  compressorKnee,
+  compressorMakeup,
+  compressorMix,
       ampGain,
       ampTone,
       ampMaster,
@@ -215,6 +236,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       flangerEnabled,
       flangerRate,
       flangerDepth,
+      flangerFeedback,
       flangerMix,
 
       octaveEnabled,
@@ -280,6 +302,16 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
   const applySettings = useCallback((s: EngineSettings) => {
     // 🔹 UI state (React)
+    setCompressorEnabled(s.compressorEnabled);
+    setCompressorThreshold(s.compressorThreshold);
+    setCompressorRatio(s.compressorRatio);
+    setCompressorAttack(s.compressorAttack);
+    setCompressorRelease(s.compressorRelease);
+    setCompressorKnee(s.compressorKnee);
+    setCompressorMakeup(s.compressorMakeup);
+    setCompressorMix(s.compressorMix);
+
+
     setAmpGain(s.ampGain);
     setAmpTone(s.ampTone);
     setAmpMaster(s.ampMaster);
@@ -314,6 +346,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     setFlangerEnabled(s.flangerEnabled);
     setFlangerRate(s.flangerRate);
     setFlangerDepth(s.flangerDepth);
+    setFlangerFeedback(s.flangerFeedback); // ✅ AGREGAR
     setFlangerMix(s.flangerMix);
 
     // ✅ Octave
@@ -342,6 +375,12 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const offlinePreviewAnimRef = useRef<number | null>(null);
   const droneEnvAmountRef = useRef<GainNode | null>(null);
   const droneGainRef = useRef<GainNode | null>(null);
+
+  const compNodeRef = useRef<DynamicsCompressorNode | null>(null);
+  const compDryRef = useRef<GainNode | null>(null);
+  const compWetRef = useRef<GainNode | null>(null);
+  const compMakeupRef = useRef<GainNode | null>(null);
+
 
   const valveDryRef = useRef<GainNode | null>(null);
   const valveWetRef = useRef<GainNode | null>(null);
@@ -375,8 +414,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // Buffer procesado offline
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
   const [processedWaveform, setProcessedWaveform] = useState<number[] | null>(null);
-  const [octaveTone, setOctaveTone] = useState(0.55);  // 0..1
-  const [octaveLevel, setOctaveLevel] = useState(0.9); // 0..1
+ 
 
   // Volumen de preview offline (0–1)
   const [offlineVolume, setOfflineVolume] = useState(1.0);
@@ -456,17 +494,17 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // 🔹 Gain node del backing para poder ajustarlo en vivo
   const backingGainRef = useRef<GainNode | null>(null);
 
-const getOrCreateAudioContext = useCallback(() => {
-  if (audioContext) return audioContext;
+  const getOrCreateAudioContext = useCallback(() => {
+    if (audioContext) return audioContext;
 
-  const ctx = new AudioContext({
-    latencyHint: 'interactive', // <- clave para evitar saltos
-   // sampleRate: 48000, // opcional (si querés fijarlo)
-  });
+    const ctx = new AudioContext({
+      latencyHint: 'interactive', // <- clave para evitar saltos
+      // sampleRate: 48000, // opcional (si querés fijarlo)
+    });
 
-  setAudioContext(ctx);
-  return ctx;
-}, [audioContext]);
+    setAudioContext(ctx);
+    return ctx;
+  }, [audioContext]);
 
   // 🔹 METRÓNOMO
   const [metronomeOn, setMetronomeOn] = useState(false);
@@ -713,13 +751,54 @@ const getOrCreateAudioContext = useCallback(() => {
     toneFilter.frequency.value = minFreq + ampTone * (maxFreq - minFreq);
     toneFilterRef.current = toneFilter;
 
+
+    // === COMPRESSOR (true bypass + parallel mix) ===
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = compressorThreshold;
+    comp.ratio.value = compressorRatio;
+    comp.attack.value = compressorAttack;
+    comp.release.value = compressorRelease;
+    comp.knee.value = compressorKnee;
+    compNodeRef.current = comp;
+
+    const compMakeup = ctx.createGain();
+    compMakeup.gain.value = compressorMakeup;
+    compMakeupRef.current = compMakeup;
+
+    // router dry/wet
+    const compDry = ctx.createGain();
+    const compWet = ctx.createGain();
+    compDryRef.current = compDry;
+    compWetRef.current = compWet;
+
+    // por defecto OFF
+    compDry.gain.value = 1.0;
+    compWet.gain.value = 0.0;
+
+    // split desde toneFilter
+    toneFilter.connect(compDry);
+    toneFilter.connect(comp);
+
+    // comp path
+    comp.connect(compMakeup);
+    compMakeup.connect(compWet);
+
+    // sum
+    const compOut = ctx.createGain();
+    compDry.connect(compOut);
+    compWet.connect(compOut);
+    let preSitarNode: AudioNode = compOut;
+    preSitarNode = compOut;
+
+
+
+
     // === MASTER GAIN NODE ===
     const masterGain = ctx.createGain();
     masterGain.gain.value = ampMaster * 2.0;
     masterGainRef.current = masterGain;
 
     // Declare preSitarNode here before first use
-    let preSitarNode: AudioNode = toneFilter;
 
     // === PEDAL RAGA (sin drone: resonador nasal en paralelo) ===
     const ragaBandpass = ctx.createBiquadFilter();
@@ -877,7 +956,6 @@ const getOrCreateAudioContext = useCallback(() => {
 
     ampGainNode.connect(driveNode);
     driveNode.connect(toneFilter);
-    let preFxNode: AudioNode = toneFilter;
     // ======================================================
     // 🎵 OCTAVE PEDAL (OFFLINE)
     // ======================================================
@@ -983,8 +1061,8 @@ const getOrCreateAudioContext = useCallback(() => {
     valveWetRef.current = valveWet;
 
     // 3) Entrada desde toneFilter: se divide a dry y al efecto
-    toneFilter.connect(valveDry);
-    toneFilter.connect(valveShaper);
+   preSitarNode.connect(valveDry);
+preSitarNode.connect(valveShaper);
 
     // salida del efecto entra al wet
     valveLevelGain.connect(valveWet);
@@ -1314,7 +1392,7 @@ const getOrCreateAudioContext = useCallback(() => {
       setStatus('Error al acceder al micrófono/placa');
     }
   }, [getOrCreateAudioContext, ensureGuitarGraph]);
-const getAnalyserNode = useCallback(() => analyserRef.current, []);
+  const getAnalyserNode = useCallback(() => analyserRef.current, []);
   // Cargar backing
   const loadBackingFile = useCallback(
     async (file: File) => {
@@ -1520,30 +1598,9 @@ const getAnalyserNode = useCallback(() => analyserRef.current, []);
 
 
         // ======================================================
-        // 🎵 OCTAVE PEDAL (OFFLINE) — usar offlineCtx
-        // ======================================================
-        const octaveDry = offlineCtx.createGain();
-        const octaveRing = offlineCtx.createGain();
-        octaveDry.gain.value = 1.0;
-        octaveRing.gain.value = 0.0;
-
-        const octaveOsc = offlineCtx.createOscillator();
-        octaveOsc.type = 'sine';
-        octaveOsc.frequency.value = 880;
-        octaveOsc.start();
-
-        // toneFilter -> dry + ring
-        toneFilter.connect(octaveDry);
-        toneFilter.connect(octaveRing);
-        octaveOsc.connect(octaveRing.gain);
-
-        // mix out
-        const octaveOut = offlineCtx.createGain();
-        octaveDry.connect(octaveOut);
-        octaveRing.connect(octaveOut);
+      
 
         // y a partir de acá seguís con octaveOut en vez de toneFilter:
-        const preSitar = octaveOut;
 
 
 
@@ -1678,6 +1735,49 @@ const getAnalyserNode = useCallback(() => analyserRef.current, []);
       recordGainRef.current.connect(destNode);
     }
   }, [audioContext]);
+
+  useEffect(() => {
+    if (!audioContext) return;
+
+    const comp = compNodeRef.current;
+    const dry = compDryRef.current;
+    const wet = compWetRef.current;
+    const makeup = compMakeupRef.current;
+    if (!comp || !dry || !wet || !makeup) return;
+
+    const t = audioContext.currentTime;
+
+    // Params
+    comp.threshold.setTargetAtTime(compressorThreshold, t, 0.01);
+    comp.ratio.setTargetAtTime(compressorRatio, t, 0.01);
+    comp.attack.setTargetAtTime(compressorAttack, t, 0.01);
+    comp.release.setTargetAtTime(compressorRelease, t, 0.01);
+    comp.knee.setTargetAtTime(compressorKnee, t, 0.01);
+
+    makeup.gain.setTargetAtTime(compressorMakeup, t, 0.01);
+
+    // True bypass + parallel blend
+    if (!compressorEnabled) {
+      wet.gain.setTargetAtTime(0, t, 0.01);
+      dry.gain.setTargetAtTime(1, t, 0.01);
+    } else {
+      // mix = cuánto comp entra (parallel). dry = 1 - mix
+      wet.gain.setTargetAtTime(compressorMix, t, 0.01);
+      dry.gain.setTargetAtTime(1 - compressorMix, t, 0.01);
+    }
+  }, [
+    audioContext,
+    compressorEnabled,
+    compressorThreshold,
+    compressorRatio,
+    compressorAttack,
+    compressorRelease,
+    compressorKnee,
+    compressorMakeup,
+    compressorMix,
+  ]);
+
+
   useEffect(() => {
     if (!audioContext) return;
     const env = droneEnvAmountRef.current;
@@ -2314,7 +2414,6 @@ const getAnalyserNode = useCallback(() => analyserRef.current, []);
   useEffect(() => {
     if (!audioContext) return;
     if (driveNodeRef.current) {
-      const amount = driveEnabled ? driveAmount * 6 : 0;
       driveNodeRef.current.curve = makeDriveCurve(driveMode, driveEnabled ? driveAmount : 0);
     }
   }, [driveAmount, driveEnabled, audioContext, driveMode]);
@@ -2382,6 +2481,9 @@ const getAnalyserNode = useCallback(() => analyserRef.current, []);
   // 🔥 Actualización en vivo del pedal Raga
 
   const value: AudioEngineContextValue = {
+
+
+
     status,
     isInputReady,
     isRecording,
@@ -2441,6 +2543,7 @@ const getAnalyserNode = useCallback(() => analyserRef.current, []);
     mixAmount,
     setMixAmount,
 
+
     // Amp
     ampGain,
     setAmpGain,
@@ -2448,7 +2551,22 @@ const getAnalyserNode = useCallback(() => analyserRef.current, []);
     setAmpTone,
     ampMaster,
     setAmpMaster,
-
+ compressorEnabled,
+  setCompressorEnabled,
+  compressorThreshold,
+  setCompressorThreshold,
+  compressorRatio,
+  setCompressorRatio,
+  compressorAttack,
+  setCompressorAttack,
+  compressorRelease,
+  setCompressorRelease,
+  compressorKnee,
+  setCompressorKnee,
+  compressorMakeup,
+  setCompressorMakeup,
+  compressorMix,
+  setCompressorMix,
     // Tonestack
     bassAmount,
     setBassAmount,
@@ -2529,6 +2647,8 @@ const getAnalyserNode = useCallback(() => analyserRef.current, []);
     recordingSeconds,
     valveMode,
     setValveMode,
+
+    
   };
 
   return (
