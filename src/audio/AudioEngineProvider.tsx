@@ -800,25 +800,6 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
     // Declare preSitarNode here before first use
 
-    // === PEDAL RAGA (sin drone: resonador nasal en paralelo) ===
-    const ragaBandpass = ctx.createBiquadFilter();
-    ragaBandpass.type = 'bandpass';
-    // valores base, después se actualizan por useEffect
-    ragaBandpass.frequency.value = 2000;
-    ragaBandpass.Q.value = 5;
-
-    const ragaGain = ctx.createGain();
-    // arranca apagado, lo prende el pedal
-    ragaGain.gain.value = 0;
-
-    // Cadena: toneFilter → ragaBandpass → ragaGain → masterGain
-    preSitarNode.connect(ragaBandpass);
-    ragaBandpass.connect(ragaGain);
-    ragaGain.connect(masterGain);
-
-    // Guardar refs para el live update
-    ragaFilterRef.current = ragaBandpass;
-    ragaGainRef.current = ragaGain;
 
     // === SYMPATHETIC STRINGS — brillo super agudo estilo sitar ===
 
@@ -962,74 +943,57 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
 
     // ======================================================
-    // 🌺 RESIDUAL DRONE ENGINE (alma del sitar)
     // ======================================================
+// 🌺 TONAL DRONE ENGINE (sin shhhh)
+// ======================================================
 
-    // 1) Fuente de ruido constante (muy bajo nivel)
-    const droneNoiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-    const noiseData = droneNoiseBuffer.getChannelData(0);
-    for (let i = 0; i < noiseData.length; i++) {
-      noiseData[i] = (Math.random() * 2 - 1) * 0.15;
-    }
+// Gain general del drone (lo abre/cierra el useEffect con ragaDroneLevel)
+const droneGain = ctx.createGain();
+droneGain.gain.value = 0.0;
+droneGainRef.current = droneGain;
 
-    const droneNoise = ctx.createBufferSource();
-    droneNoise.buffer = droneNoiseBuffer;
-    droneNoise.loop = true;
+// Tónico base (después lo ajustamos por useEffect con ragaColor)
+const tonicOsc = ctx.createOscillator();
+tonicOsc.type = 'sine';
+tonicOsc.frequency.value = 110; // default, luego se actualiza
 
-    // 2) Filtro resonante (cuerdas simpáticas)
-    const droneFilter = ctx.createBiquadFilter();
-    droneFilter.type = 'bandpass';
-    droneFilter.frequency.value = 2200; // rango sitar
-    droneFilter.Q.value = 28;           // MUY resonante
-    // 2.5) Ganancia del drone (nivel base + envelope)
-    const droneGain = ctx.createGain();
-    droneGain.gain.value = 0.0; // arranca cerrado, lo abre el envelope
+const fifthOsc = ctx.createOscillator();
+fifthOsc.type = 'sine';
+fifthOsc.frequency.value = 165; // 110*1.5
 
-    // 3) Envelope follower REAL (rectificador + lowpass)
+const octaveOsc = ctx.createOscillator();
+octaveOsc.type = 'sine';
+octaveOsc.frequency.value = 220; // 110*2
 
-    // Rectificador full-wave (abs)
-    const droneRectifier = ctx.createWaveShaper();
-    droneRectifier.curve = (() => {
-      const n = 2048;
-      const curve = new Float32Array(n);
-      for (let i = 0; i < n; i++) {
-        const x = (i / (n - 1)) * 2 - 1;
-        curve[i] = Math.abs(x);
-      }
-      return curve;
-    })();
-    droneRectifier.oversample = "4x";
+// Mezcla muy suave
+const droneMix = ctx.createGain();
+droneMix.gain.value = 0.12;
 
-    // Lowpass para suavizar la envolvente (respira lento)
-    const droneEnvLP = ctx.createBiquadFilter();
-    droneEnvLP.type = "lowpass";
-    droneEnvLP.frequency.value = 8; // MÁS lento = más cola
+tonicOsc.connect(droneMix);
+fifthOsc.connect(droneMix);
+octaveOsc.connect(droneMix);
 
-    // Excitación desde la guitarra
-    toneFilter.connect(droneRectifier);
-    droneRectifier.connect(droneEnvLP);
-    const droneEnvAmount = ctx.createGain();
-    droneEnvAmount.gain.value = 0.0; // arranca cerrado
-    droneEnvAmountRef.current = droneEnvAmount;
+// Filtrado para que suene "tipo sitar" (sin subgrave)
+const droneHP = ctx.createBiquadFilter();
+droneHP.type = 'highpass';
+droneHP.frequency.value = 90;
 
-    droneGain.gain.value = 0.0; // arranca cerrado
-    droneGainRef.current = droneGain;
+const droneLP = ctx.createBiquadFilter();
+droneLP.type = 'lowpass';
+droneLP.frequency.value = 1800;
 
-    droneEnvAmount.connect(droneGain.gain);
+droneMix.connect(droneHP);
+droneHP.connect(droneLP);
+droneLP.connect(droneGain);
+droneGain.connect(masterGain);
 
+tonicOsc.start();
+fifthOsc.start();
+octaveOsc.start();
 
-    droneEnvLP.connect(droneEnvAmount);
+// guardamos refs para update
+octaveOscRef.current = octaveOsc; // si querés reutilizar ref, o creá una ref nueva
 
-    // Controla la ganancia del drone
-
-
-    // Camino del drone
-    droneNoise.connect(droneFilter);
-    droneFilter.connect(droneGain);
-    droneGain.connect(masterGain);
-
-    // Arrancar ruido
-    droneNoise.start();
 
     // === VALVE CRUNCH (true bypass con dry/wet) ===
 
@@ -1271,8 +1235,37 @@ preSitarNode.connect(valveShaper);
 
     // Desde ahora, todo lo que antes iba a preDelayGain, sale de flangerOut
     const preDelayInput = flangerOut;
-    // ✅ CONEXIONES SITAR (LIVE) — acá SÍ existe preDelayInput
+    
+    // === PEDAL RAGA (sin drone: resonador nasal en paralelo) ===
+    const ragaBandpass = ctx.createBiquadFilter();
+    ragaBandpass.type = 'bandpass';
+    // valores base, después se actualizan por useEffect
+    ragaBandpass.frequency.value = 2000;
+    ragaBandpass.Q.value = 5;
 
+    const ragaGain = ctx.createGain();
+    // arranca apagado, lo prende el pedal
+    ragaGain.gain.value = 0;
+
+    // Cadena: toneFilter → ragaBandpass → ragaGain → masterGain
+    preSitarNode.connect(ragaBandpass);
+    ragaBandpass.connect(ragaGain);
+    ragaGain.connect(masterGain);
+
+    // Guardar refs para el live update
+    ragaFilterRef.current = ragaBandpass;
+    ragaGainRef.current = ragaGain;
+
+
+    // ✅ CONEXIONES SITAR (LIVE) — acá SÍ existe preDelayInput
+// Raga parallel SUMADO AL MISMO BUS
+preDelayInput.connect(ragaBandpass);
+ragaBandpass.connect(ragaGain);
+ragaGain.connect(preDelayGain); // o preDelayInput directo si querés
+
+preDelayInput.connect(ragaSym);
+ragaSym.connect(ragaSymGain);
+ragaSymGain.connect(preDelayGain);
     // Alimentar el camino WET (jawari + resonancias)
     preDelayInput.connect(sitarBandpass);
     sitarBandpass.connect(jawariDrive);
@@ -1778,23 +1771,31 @@ preSitarNode.connect(valveShaper);
   ]);
 
 
-  useEffect(() => {
-    if (!audioContext) return;
-    const env = droneEnvAmountRef.current;
-    const g = droneGainRef.current;
-    if (!env || !g) return;
+useEffect(() => {
+  if (!audioContext) return;
 
-    const t = audioContext.currentTime;
+  const env = droneEnvAmountRef.current;
+  const g = droneGainRef.current;
+  if (!env || !g) return;
 
-    if (!ragaEnabled || ragaDroneLevel <= 0.001) {
-      env.gain.setTargetAtTime(0, t, 0.03);
-      g.gain.setTargetAtTime(0, t, 0.03);
-      return;
-    }
+  const t = audioContext.currentTime;
 
-    // cuánto abre la envolvente (subí/bajá a gusto)
-    env.gain.setTargetAtTime(0.35 * ragaDroneLevel, t, 0.03);
-  }, [audioContext, ragaEnabled, ragaDroneLevel]);
+  // OFF total
+  if (!ragaEnabled || ragaDroneLevel <= 0.001) {
+    env.gain.setTargetAtTime(0, t, 0.05);
+    g.gain.setTargetAtTime(0, t, 0.05);
+    return;
+  }
+
+  // 🔥 DRONE REAL (alma del sitar)
+  // cuánto abre la envolvente (respuesta a la guitarra)
+  const envAmount = 0.25 + ragaDroneLevel * 0.75; // rango musical
+  env.gain.setTargetAtTime(envAmount, t, 0.06);
+
+  // volumen final del drone (cola constante)
+  const droneLevel = ragaDroneLevel * 0.6;
+  g.gain.setTargetAtTime(droneLevel, t, 0.08);
+}, [audioContext, ragaEnabled, ragaDroneLevel]);
 
   useEffect(() => {
     if (!audioContext) return;
@@ -2157,9 +2158,10 @@ preSitarNode.connect(valveShaper);
       return;
     }
 
-    // 1) LEVEL: cuánta señal del resonador se mezcla
-    //    (usa tu knob "DRONE" como mezcla de efecto)
-    out.gain.setTargetAtTime(ragaDroneLevel, t, 0.01);
+   // Mix del efecto (usamos Resonance como mix, por ejemplo)
+const mix = ragaEnabled ? (0.15 + ragaResonance * 0.85) : 0;
+out.gain.setTargetAtTime(mix, t, 0.01);
+
 
     // 2) RESONANCE: Q del band-pass
     const minQ = 1;

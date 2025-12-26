@@ -53,6 +53,8 @@ type KnobProps = {
   labelColor: string;
   valueColor: string;
   faceGradient: string;
+  minWidth?: number; // ✅ NUEVO
+
 };
 
 const Knob: React.FC<KnobProps> = ({
@@ -186,11 +188,11 @@ const PRESETS: Record<
       phaserCenter: 0.5,
 
       // 🌫️ Flanger tipo chorus
-     flangerEnabled: true,
-    flangerRate: 0.12,
-    flangerDepth: 0.15,
-    flangerMix: 0.18,
-    flangerFeedback: 0.0,
+      flangerEnabled: true,
+      flangerRate: 0.12,
+      flangerDepth: 0.15,
+      flangerMix: 0.18,
+      flangerFeedback: 0.0,
 
       // Octave apagado
       octaveEnabled: false,
@@ -1747,7 +1749,7 @@ const AmpPanel: React.FC = () => {
                   <div
                     style={{
                       display: 'flex',
-                      gap: '3.5rem',
+                      gap: '4.5rem',
                       justifyContent: 'center',
                       flexWrap: 'wrap',
                     }}
@@ -1898,21 +1900,21 @@ const AmpPanel: React.FC = () => {
                           backgroundRepeat: 'no-repeat',
                           backgroundPosition: 'center',
                           display: 'flex',
-                          alignItems: 'flex-end',
+                          alignItems: 'center',
                           justifyContent: 'center',
-                          paddingBottom: '1.4rem',
                         }}
                       >
+                        {/* ===== FILA SUPERIOR (2 knobs) ===== */}
                         <div
                           style={{
+                            position: 'absolute',
+                            top: 160,
                             display: 'flex',
-                            padding: '0.4rem 0.7rem',
+                            gap: '0.5rem',
+                            padding: '0.35rem 0.6rem',
                             borderRadius: 999,
                             backdropFilter: 'blur(4px)',
                             background: 'rgba(0,0,0,0.45)',
-                            position: 'absolute',
-                            top: '255px',
-                            gap: '0.5rem',
                           }}
                         >
                           <Knob
@@ -1944,7 +1946,21 @@ const AmpPanel: React.FC = () => {
                             valueColor="#e5e7eb"
                             faceGradient={skin.knobFaceGradient}
                           />
+                        </div>
 
+                        {/* ===== FILA INFERIOR (3 knobs) ===== */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 255,
+                            display: 'flex',
+                            gap: '0.5rem',
+                            padding: '0.4rem 0.7rem',
+                            borderRadius: 999,
+                            backdropFilter: 'blur(4px)',
+                            background: 'rgba(0,0,0,0.45)',
+                          }}
+                        >
                           <Knob
                             label="FB"
                             min={0}
@@ -2442,21 +2458,21 @@ const AmpPanel: React.FC = () => {
                           backgroundRepeat: 'no-repeat',
                           backgroundPosition: 'center',
                           display: 'flex',
-                          alignItems: 'flex-end',
+                          alignItems: 'center',
                           justifyContent: 'center',
-                          paddingBottom: '1.4rem',
                         }}
                       >
+                        {/* ===== FILA SUPERIOR (3 knobs) ===== */}
                         <div
                           style={{
+                            position: 'absolute',
+                            top: 150,
                             display: 'flex',
+                            gap: '0.5rem',
                             padding: '0.4rem 0.7rem',
                             borderRadius: 999,
                             backdropFilter: 'blur(4px)',
                             background: 'rgba(0,0,0,0.45)',
-                            position: 'absolute',
-                            top: '255px',
-                            gap: '0.5rem',
                           }}
                         >
                           <Knob
@@ -2490,36 +2506,6 @@ const AmpPanel: React.FC = () => {
                           />
 
                           <Knob
-                            label="Attack"
-                            min={1}
-                            max={80}
-                            value={Math.round(compressorAttack * 1000)}
-                            onChange={(v) => {
-                              setCompressorAttack(v / 1000); // ms -> s
-                              markCustom();
-                            }}
-                            display={`${Math.round(compressorAttack * 1000)} ms`}
-                            labelColor="#f9fafb"
-                            valueColor="#e5e7eb"
-                            faceGradient={skin.knobFaceGradient}
-                          />
-
-                          <Knob
-                            label="Release"
-                            min={40}
-                            max={800}
-                            value={Math.round(compressorRelease * 1000)}
-                            onChange={(v) => {
-                              setCompressorRelease(v / 1000); // ms -> s
-                              markCustom();
-                            }}
-                            display={`${Math.round(compressorRelease * 1000)} ms`}
-                            labelColor="#f9fafb"
-                            valueColor="#e5e7eb"
-                            faceGradient={skin.knobFaceGradient}
-                          />
-
-                          <Knob
                             label="Mix"
                             min={0}
                             max={100}
@@ -2535,19 +2521,49 @@ const AmpPanel: React.FC = () => {
                           />
                         </div>
 
-                        {/* fila 2 knobs (Knee + Makeup) si querés */}
+                        {/* ===== FILA INFERIOR (4 knobs) ===== */}
                         <div
                           style={{
+                            position: 'absolute',
+                            top: 256,
                             display: 'flex',
+                            gap: '0.35rem',
                             padding: '0.35rem 0.6rem',
                             borderRadius: 999,
                             backdropFilter: 'blur(4px)',
                             background: 'rgba(0,0,0,0.35)',
-                            position: 'absolute',
-                            top: '205px',
-                            gap: '0.5rem',
                           }}
                         >
+                          <Knob
+                            label="Attack"
+                            min={1}
+                            max={80}
+                            value={Math.round(compressorAttack * 1000)}
+                            onChange={(v) => {
+                              setCompressorAttack(v / 1000);
+                              markCustom();
+                            }}
+                            display={`${Math.round(compressorAttack * 1000)} ms`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+
+                          <Knob
+                            label="Release"
+                            min={40}
+                            max={800}
+                            value={Math.round(compressorRelease * 1000)}
+                            onChange={(v) => {
+                              setCompressorRelease(v / 1000);
+                              markCustom();
+                            }}
+                            display={`${Math.round(compressorRelease * 1000)} ms`}
+                            labelColor="#f9fafb"
+                            valueColor="#e5e7eb"
+                            faceGradient={skin.knobFaceGradient}
+                          />
+
                           <Knob
                             label="Knee"
                             min={0}
@@ -2572,7 +2588,7 @@ const AmpPanel: React.FC = () => {
                               setCompressorMakeup(v / 100);
                               markCustom();
                             }}
-                            display={`${compressorMakeup.toFixed(2)}`}
+                            display={`${compressorMakeup.toFixed(2)}x`}
                             labelColor="#f9fafb"
                             valueColor="#e5e7eb"
                             faceGradient={skin.knobFaceGradient}
@@ -2580,6 +2596,7 @@ const AmpPanel: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* BOTÓN ON / OFF */}
                       <button
                         type="button"
                         onClick={() => {
@@ -2613,6 +2630,7 @@ const AmpPanel: React.FC = () => {
                         {compressorEnabled ? 'Comp On' : 'Comp Off'}
                       </button>
                     </div>
+
 
 
                     {/* --------- PEDAL SITAR+ (RAGA) ---------- */}
