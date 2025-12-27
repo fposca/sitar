@@ -129,7 +129,14 @@ const DEFAULTS: EngineSettingsV1 = {
   compressorKnee: 0,
   compressorMakeup: 0,
   compressorMix: 0,
-  flangerFeedback: 0
+  flangerFeedback: 0,
+  isPunchArmed: false,
+  armPunchIn: function (cursorSec: number): void {
+    throw new Error("Function not implemented.");
+  },
+  setIsPunchArmed: function (v: boolean): void {
+    throw new Error("Function not implemented.");
+  }
 };
 
 function sanitizeSettingsV1(raw: any): EngineSettingsV1 | null {

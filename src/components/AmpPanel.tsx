@@ -150,13 +150,13 @@ const PRESETS: Record<
     settings: {
       // ✅ COMPRESSOR (defaults)
       compressorEnabled: false,
-      compressorThreshold: -18,  // dB
-      compressorRatio: 4,        // 1..20
-      compressorAttack: 0.01,    // seconds
-      compressorRelease: 0.2,    // seconds
-      compressorKnee: 12,        // dB
-      compressorMakeup: 1.0,     // linear gain (1 = 0dB)
-      compressorMix: 1.0,        // 0..1
+      compressorThreshold: -18, // dB
+      compressorRatio: 4, // 1..20
+      compressorAttack: 0.01, // seconds
+      compressorRelease: 0.2, // seconds
+      compressorKnee: 12, // dB
+      compressorMakeup: 1.0, // linear gain (1 = 0dB)
+      compressorMix: 1.0, // 0..1
 
       ampGain: 0.9,
       ampTone: 0.55,
@@ -212,6 +212,13 @@ const PRESETS: Record<
       ragaResonance: 0.45,
       ragaDroneLevel: 0.25,
       ragaColor: 0.5,
+      isPunchArmed: false,
+      armPunchIn: function (cursorSec: number): void {
+        throw new Error('Function not implemented.');
+      },
+      setIsPunchArmed: function (v: boolean): void {
+        throw new Error('Function not implemented.');
+      }
     },
   },
   desertLead: {
@@ -220,13 +227,13 @@ const PRESETS: Record<
     settings: {
       // ✅ COMPRESSOR (defaults)
       compressorEnabled: false,
-      compressorThreshold: -18,  // dB
-      compressorRatio: 4,        // 1..20
-      compressorAttack: 0.01,    // seconds
-      compressorRelease: 0.2,    // seconds
-      compressorKnee: 12,        // dB
-      compressorMakeup: 1.0,     // linear gain (1 = 0dB)
-      compressorMix: 1.0,        // 0..1
+      compressorThreshold: -18, // dB
+      compressorRatio: 4, // 1..20
+      compressorAttack: 0.01, // seconds
+      compressorRelease: 0.2, // seconds
+      compressorKnee: 12, // dB
+      compressorMakeup: 1.0, // linear gain (1 = 0dB)
+      compressorMix: 1.0, // 0..1
 
       ampGain: 1.25,
       ampTone: 0.62,
@@ -282,6 +289,13 @@ const PRESETS: Record<
       ragaResonance: 0.4,
       ragaDroneLevel: 0.3,
       ragaColor: 0.45,
+      isPunchArmed: false,
+      armPunchIn: function (cursorSec: number): void {
+        throw new Error('Function not implemented.');
+      },
+      setIsPunchArmed: function (v: boolean): void {
+        throw new Error('Function not implemented.');
+      }
     },
   },
   infernalRaga: {
@@ -290,13 +304,13 @@ const PRESETS: Record<
     settings: {
       // ✅ COMPRESSOR (defaults)
       compressorEnabled: false,
-      compressorThreshold: -18,  // dB
-      compressorRatio: 4,        // 1..20
-      compressorAttack: 0.01,    // seconds
-      compressorRelease: 0.2,    // seconds
-      compressorKnee: 12,        // dB
-      compressorMakeup: 1.0,     // linear gain (1 = 0dB)
-      compressorMix: 1.0,        // 0..1
+      compressorThreshold: -18, // dB
+      compressorRatio: 4, // 1..20
+      compressorAttack: 0.01, // seconds
+      compressorRelease: 0.2, // seconds
+      compressorKnee: 12, // dB
+      compressorMakeup: 1.0, // linear gain (1 = 0dB)
+      compressorMix: 1.0, // 0..1
 
       ampGain: 1.5,
       ampTone: 0.7,
@@ -352,6 +366,13 @@ const PRESETS: Record<
       ragaResonance: 0.65,
       ragaDroneLevel: 0.45,
       ragaColor: 0.6,
+      isPunchArmed: false,
+      armPunchIn: function (cursorSec: number): void {
+        throw new Error('Function not implemented.');
+      },
+      setIsPunchArmed: function (v: boolean): void {
+        throw new Error('Function not implemented.');
+      }
     },
   },
 };

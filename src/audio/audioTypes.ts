@@ -4,7 +4,18 @@ export type SitarMode = 'sharp' | 'major' | 'minor' | 'exotic';
 export type DriveMode = 'overdrive' | 'crunch' | 'distortion';
 
 // ✅ Settings “core” para presets (base + custom)
+export type Take = {
+  id: string;        // uuid o timestamp
+  name: string;      // "Take 01", etc
+  blob: Blob;
+  url: string;       // ObjectURL o ruta
+  durationSec: number;  // segundos
+};
 export type EngineSettings = {
+  isPunchArmed: boolean;
+armPunchIn: (cursorSec: number) => void;
+setIsPunchArmed: (v: boolean) => void; // opcional
+
   ampGain: number;
   ampTone: number;
   ampMaster: number;
@@ -66,6 +77,12 @@ flangerFeedback: number;
   ragaColor: number;
 };
 export type AudioEngineContextValue = {
+   // Punch-in
+  isPunchArmed: boolean;
+  armPunchIn: (cursorSec: number) => void;
+
+  // opcional (si lo querés exponer)
+  setIsPunchArmed?: React.Dispatch<React.SetStateAction<boolean>>;
   status: string;
   isInputReady: boolean;
   isRecording: boolean;
@@ -251,10 +268,17 @@ setValveLevel: (v: number) => void;
   setPhaserMix: (v: number) => void;
   phaserCenter: number;      // 0..1
   setPhaserCenter: (v: number) => void;
-
+// ✅ TAKES
+  takes: Take[];
+  activeTakeId: string | null;
+  setActiveTakeId: React.Dispatch<React.SetStateAction<string | null>>;
   // Acciones
   setupGuitarInput: () => Promise<void>;
   loadBackingFile: (file: File) => Promise<void>;
   startPlaybackAndRecording: () => Promise<void>;
   stopRecording: () => void;
+
+
+disarmPunchIn: () => void;
+
 };

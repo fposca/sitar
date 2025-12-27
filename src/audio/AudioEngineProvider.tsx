@@ -9,6 +9,13 @@ import React, {
 } from 'react';
 import type { AudioEngineContextValue, DriveMode, EngineSettings, SitarMode } from './audioTypes';
 import { applySitarMode, makeDriveCurve, computeWaveform } from './audioDSP';
+type Take = {
+  id: string;
+  name: string;
+  blob: Blob;
+  url: string;
+  durationSec: number;
+};
 
 // Convierte un AudioBuffer en un ArrayBuffer con formato WAV PCM 16-bit
 function audioBufferToWav(buffer: AudioBuffer): ArrayBuffer {
@@ -82,6 +89,87 @@ function audioBufferToWav(buffer: AudioBuffer): ArrayBuffer {
   return wav;
 }
 
+async function blobToAudioBuffer(ctx: AudioContext, blob: Blob) {
+  const ab = await blob.arrayBuffer();
+  return await ctx.decodeAudioData(ab.slice(0));
+}
+
+function sliceAudioBuffer(ctx: BaseAudioContext, src: AudioBuffer, startSec: number): AudioBuffer {
+  const sr = src.sampleRate;
+  const start = Math.max(0, Math.min(src.length, Math.floor(startSec * sr)));
+  const outLen = Math.max(0, src.length - start);
+
+  const out = ctx.createBuffer(src.numberOfChannels, outLen, sr);
+
+  for (let ch = 0; ch < out.numberOfChannels; ch++) {
+    const s = src.getChannelData(ch);
+    const o = out.getChannelData(ch);
+    o.set(s.subarray(start, start + outLen));
+  }
+
+  return out;
+}
+
+function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
+  const wavArrayBuffer = audioBufferToWav(buffer);
+  return new Blob([wavArrayBuffer], { type: 'audio/wav' });
+}
+
+
+function spliceReplaceWithCrossfade(
+  ctx: BaseAudioContext,
+  base: AudioBuffer,
+  insert: AudioBuffer,
+  startSec: number,
+  xfadeMs = 10
+) {
+  const sr = base.sampleRate;
+  const start = Math.max(0, Math.min(base.length, Math.floor(startSec * sr)));
+  const insertLen = insert.length;
+
+  const endReplace = Math.min(base.length, start + insertLen);
+
+  const outLen = start + insertLen + (base.length - endReplace);
+  const out = ctx.createBuffer(base.numberOfChannels, outLen, sr);
+
+  const xfade = Math.floor((xfadeMs / 1000) * sr);
+
+  for (let ch = 0; ch < out.numberOfChannels; ch++) {
+    const o = out.getChannelData(ch);
+    const b = base.getChannelData(Math.min(ch, base.numberOfChannels - 1));
+    const i = insert.getChannelData(Math.min(ch, insert.numberOfChannels - 1));
+
+    // 1) copy base head
+    o.set(b.subarray(0, start), 0);
+
+    // 2) copy insert with fade-in + fade-out
+    // fade-in
+    for (let n = 0; n < Math.min(xfade, insertLen); n++) {
+      const t = n / Math.max(1, Math.min(xfade, insertLen) - 1);
+      o[start + n] = i[n] * t;
+    }
+    // middle
+    const midStart = Math.min(xfade, insertLen);
+    const midEnd = Math.max(midStart, insertLen - xfade);
+    if (midEnd > midStart) {
+      o.set(i.subarray(midStart, midEnd), start + midStart);
+    }
+    // fade-out
+    for (let n = Math.max(midEnd, 0); n < insertLen; n++) {
+      const idx = n - midEnd;
+      const denom = Math.max(1, insertLen - midEnd - 1);
+      const t = 1 - idx / denom;
+      o[start + n] = i[n] * t;
+    }
+
+    // 3) copy base tail (después del tramo reemplazado)
+    const tail = b.subarray(endReplace);
+    o.set(tail, start + insertLen);
+  }
+
+  return out;
+}
+
 const AudioEngineContext = createContext<AudioEngineContextValue | null>(null);
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -126,7 +214,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // 🎵 Octave pedal
   const [octaveEnabled, setOctaveEnabled] = useState(false);
   const [octaveMix, setOctaveMix] = useState(0.4); // 0..1
-   const [octaveTone, setOctaveTone] = useState(0.55);  // 0..1
+  const [octaveTone, setOctaveTone] = useState(0.55);  // 0..1
   const [octaveLevel, setOctaveLevel] = useState(0.9); // 0..1
   // const [octaveAmount, setOctaveAmount] = useState(1); // 1 = +1 octava
 
@@ -203,13 +291,14 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     return {
       compressorEnabled,
 
-  compressorThreshold,
-  compressorRatio,
-  compressorAttack,
-  compressorRelease,
-  compressorKnee,
-  compressorMakeup,
-  compressorMix,
+
+      compressorThreshold,
+      compressorRatio,
+      compressorAttack,
+      compressorRelease,
+      compressorKnee,
+      compressorMakeup,
+      compressorMix,
       ampGain,
       ampTone,
       ampMaster,
@@ -254,6 +343,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       ragaResonance,
       ragaDroneLevel,
       ragaColor,
+      isPunchArmed,
+      armPunchIn,
+      setIsPunchArmed,
     };
   }, [
     ampGain,
@@ -298,6 +390,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     ragaResonance,
     ragaDroneLevel,
     ragaColor,
+ 
   ]);
 
   const applySettings = useCallback((s: EngineSettings) => {
@@ -375,6 +468,16 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const offlinePreviewAnimRef = useRef<number | null>(null);
   const droneEnvAmountRef = useRef<GainNode | null>(null);
   const droneGainRef = useRef<GainNode | null>(null);
+const [takes, setTakes] = useState<Take[]>([]);
+const activeTakeIdRef = useRef<string | null>(null);
+
+
+
+
+
+// punch-in session
+const punchCursorSecRef = useRef<number>(0);
+const isPunchArmedRef = useRef<boolean>(false);
 
   const compNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const compDryRef = useRef<GainNode | null>(null);
@@ -414,7 +517,8 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   // Buffer procesado offline
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
   const [processedWaveform, setProcessedWaveform] = useState<number[] | null>(null);
- 
+const [activeTakeId, setActiveTakeId] = useState<string | null>(null);
+const [isPunchArmed, setIsPunchArmed] = useState(false);
 
   // Volumen de preview offline (0–1)
   const [offlineVolume, setOfflineVolume] = useState(1.0);
@@ -521,7 +625,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     setMetronomeOn(false);
   }, []);
 
-
+useEffect(() => { activeTakeIdRef.current = activeTakeId; }, [activeTakeId]);
+const takesRef = useRef<Take[]>([]);
+useEffect(() => { takesRef.current = takes; }, [takes]);
 
   // crear / actualizar intervalo del metrónomo
   useEffect(() => {
@@ -534,6 +640,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
       }
       return;
     }
+
 
     const effectiveBpm = bpm <= 0 ? 1 : bpm;
     const intervalMs = (60 / effectiveBpm) * 1000;
@@ -562,6 +669,9 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     };
   }, [audioContext, bpm, metronomeOn, metronomeVolume]);
 
+  useEffect(() => {
+  isPunchArmedRef.current = isPunchArmed;
+}, [isPunchArmed]);
   // ---------- PLAY / EXPORT DEL PROCESADO OFFLINE ----------
 
   const playProcessed = useCallback(() => {
@@ -944,55 +1054,55 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
     // ======================================================
     // ======================================================
-// 🌺 TONAL DRONE ENGINE (sin shhhh)
-// ======================================================
+    // 🌺 TONAL DRONE ENGINE (sin shhhh)
+    // ======================================================
 
-// Gain general del drone (lo abre/cierra el useEffect con ragaDroneLevel)
-const droneGain = ctx.createGain();
-droneGain.gain.value = 0.0;
-droneGainRef.current = droneGain;
+    // Gain general del drone (lo abre/cierra el useEffect con ragaDroneLevel)
+    const droneGain = ctx.createGain();
+    droneGain.gain.value = 0.0;
+    droneGainRef.current = droneGain;
 
-// Tónico base (después lo ajustamos por useEffect con ragaColor)
-const tonicOsc = ctx.createOscillator();
-tonicOsc.type = 'sine';
-tonicOsc.frequency.value = 110; // default, luego se actualiza
+    // Tónico base (después lo ajustamos por useEffect con ragaColor)
+    const tonicOsc = ctx.createOscillator();
+    tonicOsc.type = 'sine';
+    tonicOsc.frequency.value = 110; // default, luego se actualiza
 
-const fifthOsc = ctx.createOscillator();
-fifthOsc.type = 'sine';
-fifthOsc.frequency.value = 165; // 110*1.5
+    const fifthOsc = ctx.createOscillator();
+    fifthOsc.type = 'sine';
+    fifthOsc.frequency.value = 165; // 110*1.5
 
-const octaveOsc = ctx.createOscillator();
-octaveOsc.type = 'sine';
-octaveOsc.frequency.value = 220; // 110*2
+    const octaveOsc = ctx.createOscillator();
+    octaveOsc.type = 'sine';
+    octaveOsc.frequency.value = 220; // 110*2
 
-// Mezcla muy suave
-const droneMix = ctx.createGain();
-droneMix.gain.value = 0.12;
+    // Mezcla muy suave
+    const droneMix = ctx.createGain();
+    droneMix.gain.value = 0.12;
 
-tonicOsc.connect(droneMix);
-fifthOsc.connect(droneMix);
-octaveOsc.connect(droneMix);
+    tonicOsc.connect(droneMix);
+    fifthOsc.connect(droneMix);
+    octaveOsc.connect(droneMix);
 
-// Filtrado para que suene "tipo sitar" (sin subgrave)
-const droneHP = ctx.createBiquadFilter();
-droneHP.type = 'highpass';
-droneHP.frequency.value = 90;
+    // Filtrado para que suene "tipo sitar" (sin subgrave)
+    const droneHP = ctx.createBiquadFilter();
+    droneHP.type = 'highpass';
+    droneHP.frequency.value = 90;
 
-const droneLP = ctx.createBiquadFilter();
-droneLP.type = 'lowpass';
-droneLP.frequency.value = 1800;
+    const droneLP = ctx.createBiquadFilter();
+    droneLP.type = 'lowpass';
+    droneLP.frequency.value = 1800;
 
-droneMix.connect(droneHP);
-droneHP.connect(droneLP);
-droneLP.connect(droneGain);
-droneGain.connect(masterGain);
+    droneMix.connect(droneHP);
+    droneHP.connect(droneLP);
+    droneLP.connect(droneGain);
+    droneGain.connect(masterGain);
 
-tonicOsc.start();
-fifthOsc.start();
-octaveOsc.start();
+    tonicOsc.start();
+    fifthOsc.start();
+    octaveOsc.start();
 
-// guardamos refs para update
-octaveOscRef.current = octaveOsc; // si querés reutilizar ref, o creá una ref nueva
+    // guardamos refs para update
+    octaveOscRef.current = octaveOsc; // si querés reutilizar ref, o creá una ref nueva
 
 
     // === VALVE CRUNCH (true bypass con dry/wet) ===
@@ -1025,8 +1135,8 @@ octaveOscRef.current = octaveOsc; // si querés reutilizar ref, o creá una ref 
     valveWetRef.current = valveWet;
 
     // 3) Entrada desde toneFilter: se divide a dry y al efecto
-   preSitarNode.connect(valveDry);
-preSitarNode.connect(valveShaper);
+    preSitarNode.connect(valveDry);
+    preSitarNode.connect(valveShaper);
 
     // salida del efecto entra al wet
     valveLevelGain.connect(valveWet);
@@ -1235,44 +1345,44 @@ preSitarNode.connect(valveShaper);
 
     // Desde ahora, todo lo que antes iba a preDelayGain, sale de flangerOut
     const preDelayInput = flangerOut;
-   
-// === PEDAL RAGA (resonador REAL en paralelo) ===
-const ragaRes1 = ctx.createBiquadFilter();
-ragaRes1.type = 'peaking';
-ragaRes1.frequency.value = 2200;
-ragaRes1.Q.value = 10;
-ragaRes1.gain.value = 0; // lo mueve el useEffect
 
-const ragaRes2 = ctx.createBiquadFilter();
-ragaRes2.type = 'peaking';
-ragaRes2.frequency.value = 6200;
-ragaRes2.Q.value = 16;
-ragaRes2.gain.value = 0;
+    // === PEDAL RAGA (resonador REAL en paralelo) ===
+    const ragaRes1 = ctx.createBiquadFilter();
+    ragaRes1.type = 'peaking';
+    ragaRes1.frequency.value = 2200;
+    ragaRes1.Q.value = 10;
+    ragaRes1.gain.value = 0; // lo mueve el useEffect
 
-// leve drive en el resonador (para que “muerda”)
-const ragaDrive = ctx.createWaveShaper();
-ragaDrive.oversample = '4x';
-ragaDrive.curve = makeDriveCurve('crunch', 0.25);
+    const ragaRes2 = ctx.createBiquadFilter();
+    ragaRes2.type = 'peaking';
+    ragaRes2.frequency.value = 6200;
+    ragaRes2.Q.value = 16;
+    ragaRes2.gain.value = 0;
 
-const ragaMix = ctx.createGain();
-ragaMix.gain.value = 0; // ON/OFF real por useEffect
+    // leve drive en el resonador (para que “muerda”)
+    const ragaDrive = ctx.createWaveShaper();
+    ragaDrive.oversample = '4x';
+    ragaDrive.curve = makeDriveCurve('crunch', 0.25);
 
-// input del Raga: desde el bus preDelayInput (post flanger/phaser/octave/valve)
-preDelayInput.connect(ragaRes1);
-ragaRes1.connect(ragaRes2);
-ragaRes2.connect(ragaDrive);
-ragaDrive.connect(ragaMix);
+    const ragaMix = ctx.createGain();
+    ragaMix.gain.value = 0; // ON/OFF real por useEffect
 
-// ✅ IMPORTANTE: sumarlo SIEMPRE al MISMO BUS que el resto (preDelayGain)
-// así el delay y la reverb también lo afectan
-ragaMix.connect(preDelayGain);
+    // input del Raga: desde el bus preDelayInput (post flanger/phaser/octave/valve)
+    preDelayInput.connect(ragaRes1);
+    ragaRes1.connect(ragaRes2);
+    ragaRes2.connect(ragaDrive);
+    ragaDrive.connect(ragaMix);
 
-// refs
-ragaFilterRef.current = ragaRes1;
-ragaGainRef.current = ragaMix;
+    // ✅ IMPORTANTE: sumarlo SIEMPRE al MISMO BUS que el resto (preDelayGain)
+    // así el delay y la reverb también lo afectan
+    ragaMix.connect(preDelayGain);
 
-// si querés controlar el 2do resonador también:
-ragaSympatheticRef.current = ragaRes2; // (si no querés, creá otra ref)
+    // refs
+    ragaFilterRef.current = ragaRes1;
+    ragaGainRef.current = ragaMix;
+
+    // si querés controlar el 2do resonador también:
+    ragaSympatheticRef.current = ragaRes2; // (si no querés, creá otra ref)
 
 
 
@@ -1601,7 +1711,7 @@ ragaSympatheticRef.current = ragaRes2; // (si no querés, creá otra ref)
 
 
         // ======================================================
-      
+
 
         // y a partir de acá seguís con octaveOut en vez de toneFilter:
 
@@ -1710,22 +1820,95 @@ ragaSympatheticRef.current = ragaRes2; // (si no querés, creá otra ref)
         }
       };
 
-      mr.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: 'audio/wav' });
-        recordedChunksRef.current = [];
+   mr.onstop = async () => {
+  const blob = new Blob(recordedChunksRef.current, { type: 'audio/wav' });
+  recordedChunksRef.current = [];
 
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = 'neon-sitar-take.wav';
-        document.body.appendChild(a);
-        a.click();
-        URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+  const ctx = getOrCreateAudioContext();
+  const punchBufFull = await blobToAudioBuffer(ctx, blob);
+  const punchUrl = URL.createObjectURL(blob);
 
-        setStatus('Grabación finalizada y exportada 🎧');
-      };
+  const doPunch = isPunchArmedRef.current && !!activeTakeIdRef.current;
+
+  // --- TAKE NORMAL ---
+  if (!doPunch) {
+    const take: Take = {
+      id: crypto.randomUUID(),
+      name: `Take ${takesRef.current.length + 1}`,
+      blob,
+      url: punchUrl,
+      durationSec: punchBufFull.duration,
+    };
+
+    setTakes((prev) => [...prev, take]);
+    setActiveTakeId(take.id);
+    setStatus('Take guardado ✅');
+    return;
+  }
+
+  // --- PUNCH REPLACE ---
+  setStatus('Aplicando punch-in…');
+
+  const cursorSec = Math.max(0, punchCursorSecRef.current);
+
+  const baseId = activeTakeIdRef.current!;
+  const baseTake = takesRef.current.find((t) => t.id === baseId);
+
+  if (!baseTake) {
+    // fallback si no hay base
+    const fallback: Take = {
+      id: crypto.randomUUID(),
+      name: `Take ${takesRef.current.length + 1}`,
+      blob,
+      url: punchUrl,
+      durationSec: punchBufFull.duration,
+    };
+
+    setTakes((prev) => [...prev, fallback]);
+    setActiveTakeId(fallback.id);
+    setStatus('Take guardado ✅ (no se encontró base para punch)');
+    setIsPunchArmed(false);
+    return;
+  }
+
+  // decodificar base take
+  const baseBuf = await blobToAudioBuffer(ctx, baseTake.blob);
+  const safeCursor = Math.min(cursorSec, baseBuf.duration);
+
+  // ojo: cortamos el punch desde el mismo cursor, así el insert arranca alineado
+  const insertBuf = sliceAudioBuffer(ctx, punchBufFull, safeCursor);
+
+  const merged = spliceReplaceWithCrossfade(ctx, baseBuf, insertBuf, safeCursor, 12);
+
+  const mergedBlob = audioBufferToWavBlob(merged);
+  const mergedUrl = URL.createObjectURL(mergedBlob);
+
+  // update state (SYNC) sin async
+  setTakes((prev) =>
+    prev.map((t) =>
+      t.id === baseTake.id
+        ? {
+            ...t,
+            blob: mergedBlob,
+            url: mergedUrl,
+            durationSec: merged.duration,
+            name: `${t.name} (Punch)`,
+          }
+        : t
+    )
+  );
+
+  setActiveTakeId(baseTake.id);
+  setStatus(`Punch aplicado en ${safeCursor.toFixed(2)}s ✅`);
+  setIsPunchArmed(false);
+
+  // liberar URLs viejas
+  try { URL.revokeObjectURL(baseTake.url); } catch {}
+  try { URL.revokeObjectURL(punchUrl); } catch {}
+};
+
+
+
     }
 
     // si ya existe el grafo y el recordGain, nos aseguramos que conecte
@@ -1781,31 +1964,31 @@ ragaSympatheticRef.current = ragaRes2; // (si no querés, creá otra ref)
   ]);
 
 
-useEffect(() => {
-  if (!audioContext) return;
+  useEffect(() => {
+    if (!audioContext) return;
 
-  const env = droneEnvAmountRef.current;
-  const g = droneGainRef.current;
-  if (!env || !g) return;
+    const env = droneEnvAmountRef.current;
+    const g = droneGainRef.current;
+    if (!env || !g) return;
 
-  const t = audioContext.currentTime;
+    const t = audioContext.currentTime;
 
-  // OFF total
-  if (!ragaEnabled || ragaDroneLevel <= 0.001) {
-    env.gain.setTargetAtTime(0, t, 0.05);
-    g.gain.setTargetAtTime(0, t, 0.05);
-    return;
-  }
+    // OFF total
+    if (!ragaEnabled || ragaDroneLevel <= 0.001) {
+      env.gain.setTargetAtTime(0, t, 0.05);
+      g.gain.setTargetAtTime(0, t, 0.05);
+      return;
+    }
 
-  // 🔥 DRONE REAL (alma del sitar)
-  // cuánto abre la envolvente (respuesta a la guitarra)
-  const envAmount = 0.25 + ragaDroneLevel * 0.75; // rango musical
-  env.gain.setTargetAtTime(envAmount, t, 0.06);
+    // 🔥 DRONE REAL (alma del sitar)
+    // cuánto abre la envolvente (respuesta a la guitarra)
+    const envAmount = 0.25 + ragaDroneLevel * 0.75; // rango musical
+    env.gain.setTargetAtTime(envAmount, t, 0.06);
 
-  // volumen final del drone (cola constante)
-  const droneLevel = ragaDroneLevel * 0.6;
-  g.gain.setTargetAtTime(droneLevel, t, 0.08);
-}, [audioContext, ragaEnabled, ragaDroneLevel]);
+    // volumen final del drone (cola constante)
+    const droneLevel = ragaDroneLevel * 0.6;
+    g.gain.setTargetAtTime(droneLevel, t, 0.08);
+  }, [audioContext, ragaEnabled, ragaDroneLevel]);
 
   useEffect(() => {
     if (!audioContext) return;
@@ -1985,6 +2168,21 @@ useEffect(() => {
     playbackStartTimeRef.current = null;
   };
 
+
+// ✅ PEGAR ACÁ (ANTES del startPlaybackAndRecording)
+const armPunchIn = useCallback((cursorSec: number) => {
+  punchCursorSecRef.current = cursorSec;
+  setIsPunchArmed(true);
+  setStatus(`Punch armado en ${cursorSec.toFixed(2)}s`);
+}, [setIsPunchArmed, setStatus]);
+
+const disarmPunchIn = useCallback(() => {
+  setIsPunchArmed(false);
+  punchCursorSecRef.current = 0;
+  setStatus('Punch desarmado');
+}, [setIsPunchArmed, setStatus]);
+
+
   const startPlaybackAndRecording = useCallback(async () => {
     if (!isInputReady || !guitarSourceRef.current) {
       setStatus('Configurá primero la entrada de guitarra');
@@ -2154,46 +2352,46 @@ useEffect(() => {
 
   // === Live update del pedal Raga (simple y notorio) ===
   useEffect(() => {
-  if (!audioContext) return;
+    if (!audioContext) return;
 
-  const res1 = ragaFilterRef.current;           // peaking 1
-  const mix = ragaGainRef.current;              // gain final
-  const res2 = ragaSympatheticRef.current;      // peaking 2 (reusé tu ref)
+    const res1 = ragaFilterRef.current;           // peaking 1
+    const mix = ragaGainRef.current;              // gain final
+    const res2 = ragaSympatheticRef.current;      // peaking 2 (reusé tu ref)
 
-  if (!res1 || !mix || !res2) return;
+    if (!res1 || !mix || !res2) return;
 
-  const t = audioContext.currentTime;
+    const t = audioContext.currentTime;
 
-  if (!ragaEnabled) {
-    mix.gain.setTargetAtTime(0, t, 0.02);
-    res1.gain.setTargetAtTime(0, t, 0.02);
-    res2.gain.setTargetAtTime(0, t, 0.02);
-    return;
-  }
+    if (!ragaEnabled) {
+      mix.gain.setTargetAtTime(0, t, 0.02);
+      res1.gain.setTargetAtTime(0, t, 0.02);
+      res2.gain.setTargetAtTime(0, t, 0.02);
+      return;
+    }
 
-  // 1) MIX real (Drone knob = “level” del pedal, más útil)
-  // subilo fuerte: esto es lo que te faltaba para que se note
-  const level = 0.15 + ragaDroneLevel * 1.35;   // 0.15..1.5
-  mix.gain.setTargetAtTime(level, t, 0.02);
+    // 1) MIX real (Drone knob = “level” del pedal, más útil)
+    // subilo fuerte: esto es lo que te faltaba para que se note
+    const level = 0.15 + ragaDroneLevel * 1.35;   // 0.15..1.5
+    mix.gain.setTargetAtTime(level, t, 0.02);
 
-  // 2) COLOR = mueve las 2 resonancias (cambia “nota” del timbre)
-  const base1 = 900 + ragaColor * 3200;         // 900..4100
-  const base2 = 4200 + ragaColor * 5200;        // 4200..9400
-  res1.frequency.setTargetAtTime(base1, t, 0.02);
-  res2.frequency.setTargetAtTime(base2, t, 0.02);
+    // 2) COLOR = mueve las 2 resonancias (cambia “nota” del timbre)
+    const base1 = 900 + ragaColor * 3200;         // 900..4100
+    const base2 = 4200 + ragaColor * 5200;        // 4200..9400
+    res1.frequency.setTargetAtTime(base1, t, 0.02);
+    res2.frequency.setTargetAtTime(base2, t, 0.02);
 
-  // 3) RESONANCE = Q + dB (acá aparece el carácter)
-  const q1 = 3 + ragaResonance * 22;            // 3..25
-  const q2 = 6 + ragaResonance * 26;            // 6..32
-  res1.Q.setTargetAtTime(q1, t, 0.02);
-  res2.Q.setTargetAtTime(q2, t, 0.02);
+    // 3) RESONANCE = Q + dB (acá aparece el carácter)
+    const q1 = 3 + ragaResonance * 22;            // 3..25
+    const q2 = 6 + ragaResonance * 26;            // 6..32
+    res1.Q.setTargetAtTime(q1, t, 0.02);
+    res2.Q.setTargetAtTime(q2, t, 0.02);
 
-  // ganancia de resonancia (peaking gain en dB)
-  const g1 = 2 + ragaResonance * 16;            // 2..18 dB
-  const g2 = 1 + ragaResonance * 14;            // 1..15 dB
-  res1.gain.setTargetAtTime(g1, t, 0.02);
-  res2.gain.setTargetAtTime(g2, t, 0.02);
-}, [audioContext, ragaEnabled, ragaResonance, ragaDroneLevel, ragaColor]);
+    // ganancia de resonancia (peaking gain en dB)
+    const g1 = 2 + ragaResonance * 16;            // 2..18 dB
+    const g2 = 1 + ragaResonance * 14;            // 1..15 dB
+    res1.gain.setTargetAtTime(g1, t, 0.02);
+    res2.gain.setTargetAtTime(g2, t, 0.02);
+  }, [audioContext, ragaEnabled, ragaResonance, ragaDroneLevel, ragaColor]);
 
 
 
@@ -2503,8 +2701,10 @@ useEffect(() => {
   // 🔥 Actualización en vivo del pedal Raga
 
   const value: AudioEngineContextValue = {
-
-
+ // ✅ TAKES (ESTO ES LO NUEVO)
+  takes,
+  activeTakeId,
+  setActiveTakeId,
 
     status,
     isInputReady,
@@ -2565,6 +2765,9 @@ useEffect(() => {
     mixAmount,
     setMixAmount,
 
+isPunchArmed,
+armPunchIn,
+disarmPunchIn,
 
     // Amp
     ampGain,
@@ -2573,22 +2776,22 @@ useEffect(() => {
     setAmpTone,
     ampMaster,
     setAmpMaster,
- compressorEnabled,
-  setCompressorEnabled,
-  compressorThreshold,
-  setCompressorThreshold,
-  compressorRatio,
-  setCompressorRatio,
-  compressorAttack,
-  setCompressorAttack,
-  compressorRelease,
-  setCompressorRelease,
-  compressorKnee,
-  setCompressorKnee,
-  compressorMakeup,
-  setCompressorMakeup,
-  compressorMix,
-  setCompressorMix,
+    compressorEnabled,
+    setCompressorEnabled,
+    compressorThreshold,
+    setCompressorThreshold,
+    compressorRatio,
+    setCompressorRatio,
+    compressorAttack,
+    setCompressorAttack,
+    compressorRelease,
+    setCompressorRelease,
+    compressorKnee,
+    setCompressorKnee,
+    compressorMakeup,
+    setCompressorMakeup,
+    compressorMix,
+    setCompressorMix,
     // Tonestack
     bassAmount,
     setBassAmount,
@@ -2670,7 +2873,7 @@ useEffect(() => {
     valveMode,
     setValveMode,
 
-    
+
   };
 
   return (
