@@ -121,6 +121,15 @@ const DEFAULTS: EngineSettingsV1 = {
   ragaResonance: 0.5,
   ragaDroneLevel: 0.4,
   ragaColor: 0.5,
+  compressorEnabled: false,
+  compressorThreshold: 0,
+  compressorRatio: 0,
+  compressorAttack: 0,
+  compressorRelease: 0,
+  compressorKnee: 0,
+  compressorMakeup: 0,
+  compressorMix: 0,
+  flangerFeedback: 0
 };
 
 function sanitizeSettingsV1(raw: any): EngineSettingsV1 | null {

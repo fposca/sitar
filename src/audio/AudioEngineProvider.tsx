@@ -1235,37 +1235,47 @@ preSitarNode.connect(valveShaper);
 
     // Desde ahora, todo lo que antes iba a preDelayGain, sale de flangerOut
     const preDelayInput = flangerOut;
-    
-    // === PEDAL RAGA (sin drone: resonador nasal en paralelo) ===
-    const ragaBandpass = ctx.createBiquadFilter();
-    ragaBandpass.type = 'bandpass';
-    // valores base, después se actualizan por useEffect
-    ragaBandpass.frequency.value = 2000;
-    ragaBandpass.Q.value = 5;
+   
+// === PEDAL RAGA (resonador REAL en paralelo) ===
+const ragaRes1 = ctx.createBiquadFilter();
+ragaRes1.type = 'peaking';
+ragaRes1.frequency.value = 2200;
+ragaRes1.Q.value = 10;
+ragaRes1.gain.value = 0; // lo mueve el useEffect
 
-    const ragaGain = ctx.createGain();
-    // arranca apagado, lo prende el pedal
-    ragaGain.gain.value = 0;
+const ragaRes2 = ctx.createBiquadFilter();
+ragaRes2.type = 'peaking';
+ragaRes2.frequency.value = 6200;
+ragaRes2.Q.value = 16;
+ragaRes2.gain.value = 0;
 
-    // Cadena: toneFilter → ragaBandpass → ragaGain → masterGain
-    preSitarNode.connect(ragaBandpass);
-    ragaBandpass.connect(ragaGain);
-    ragaGain.connect(masterGain);
+// leve drive en el resonador (para que “muerda”)
+const ragaDrive = ctx.createWaveShaper();
+ragaDrive.oversample = '4x';
+ragaDrive.curve = makeDriveCurve('crunch', 0.25);
 
-    // Guardar refs para el live update
-    ragaFilterRef.current = ragaBandpass;
-    ragaGainRef.current = ragaGain;
+const ragaMix = ctx.createGain();
+ragaMix.gain.value = 0; // ON/OFF real por useEffect
+
+// input del Raga: desde el bus preDelayInput (post flanger/phaser/octave/valve)
+preDelayInput.connect(ragaRes1);
+ragaRes1.connect(ragaRes2);
+ragaRes2.connect(ragaDrive);
+ragaDrive.connect(ragaMix);
+
+// ✅ IMPORTANTE: sumarlo SIEMPRE al MISMO BUS que el resto (preDelayGain)
+// así el delay y la reverb también lo afectan
+ragaMix.connect(preDelayGain);
+
+// refs
+ragaFilterRef.current = ragaRes1;
+ragaGainRef.current = ragaMix;
+
+// si querés controlar el 2do resonador también:
+ragaSympatheticRef.current = ragaRes2; // (si no querés, creá otra ref)
 
 
-    // ✅ CONEXIONES SITAR (LIVE) — acá SÍ existe preDelayInput
-// Raga parallel SUMADO AL MISMO BUS
-preDelayInput.connect(ragaBandpass);
-ragaBandpass.connect(ragaGain);
-ragaGain.connect(preDelayGain); // o preDelayInput directo si querés
 
-preDelayInput.connect(ragaSym);
-ragaSym.connect(ragaSymGain);
-ragaSymGain.connect(preDelayGain);
     // Alimentar el camino WET (jawari + resonancias)
     preDelayInput.connect(sitarBandpass);
     sitarBandpass.connect(jawariDrive);
@@ -2144,37 +2154,47 @@ useEffect(() => {
 
   // === Live update del pedal Raga (simple y notorio) ===
   useEffect(() => {
-    if (!audioContext) return;
+  if (!audioContext) return;
 
-    const bp = ragaFilterRef.current;
-    const out = ragaGainRef.current;
-    if (!bp || !out) return;
+  const res1 = ragaFilterRef.current;           // peaking 1
+  const mix = ragaGainRef.current;              // gain final
+  const res2 = ragaSympatheticRef.current;      // peaking 2 (reusé tu ref)
 
-    const t = audioContext.currentTime;
+  if (!res1 || !mix || !res2) return;
 
-    // Si el pedal está OFF, no mezcla nada
-    if (!ragaEnabled) {
-      out.gain.setTargetAtTime(0, t, 0.01);
-      return;
-    }
+  const t = audioContext.currentTime;
 
-   // Mix del efecto (usamos Resonance como mix, por ejemplo)
-const mix = ragaEnabled ? (0.15 + ragaResonance * 0.85) : 0;
-out.gain.setTargetAtTime(mix, t, 0.01);
+  if (!ragaEnabled) {
+    mix.gain.setTargetAtTime(0, t, 0.02);
+    res1.gain.setTargetAtTime(0, t, 0.02);
+    res2.gain.setTargetAtTime(0, t, 0.02);
+    return;
+  }
 
+  // 1) MIX real (Drone knob = “level” del pedal, más útil)
+  // subilo fuerte: esto es lo que te faltaba para que se note
+  const level = 0.15 + ragaDroneLevel * 1.35;   // 0.15..1.5
+  mix.gain.setTargetAtTime(level, t, 0.02);
 
-    // 2) RESONANCE: Q del band-pass
-    const minQ = 1;
-    const maxQ = 25;
-    const q = minQ + ragaResonance * (maxQ - minQ);
-    bp.Q.setTargetAtTime(q, t, 0.01);
+  // 2) COLOR = mueve las 2 resonancias (cambia “nota” del timbre)
+  const base1 = 900 + ragaColor * 3200;         // 900..4100
+  const base2 = 4200 + ragaColor * 5200;        // 4200..9400
+  res1.frequency.setTargetAtTime(base1, t, 0.02);
+  res2.frequency.setTargetAtTime(base2, t, 0.02);
 
-    // 3) COLOR: frecuencia central (grave → agudo)
-    const minF = 800;
-    const maxF = 5000;
-    const f = minF + ragaColor * (maxF - minF);
-    bp.frequency.setTargetAtTime(f, t, 0.01);
-  }, [audioContext, ragaEnabled, ragaDroneLevel, ragaResonance, ragaColor]);
+  // 3) RESONANCE = Q + dB (acá aparece el carácter)
+  const q1 = 3 + ragaResonance * 22;            // 3..25
+  const q2 = 6 + ragaResonance * 26;            // 6..32
+  res1.Q.setTargetAtTime(q1, t, 0.02);
+  res2.Q.setTargetAtTime(q2, t, 0.02);
+
+  // ganancia de resonancia (peaking gain en dB)
+  const g1 = 2 + ragaResonance * 16;            // 2..18 dB
+  const g2 = 1 + ragaResonance * 14;            // 1..15 dB
+  res1.gain.setTargetAtTime(g1, t, 0.02);
+  res2.gain.setTargetAtTime(g2, t, 0.02);
+}, [audioContext, ragaEnabled, ragaResonance, ragaDroneLevel, ragaColor]);
+
 
 
 

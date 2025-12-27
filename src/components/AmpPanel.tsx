@@ -850,7 +850,7 @@ const AmpPanel: React.FC = () => {
               textTransform: 'uppercase',
             }}
           >
-            Sitar Amp
+            Raga Amp
           </div>
           <div
             style={{
@@ -1409,7 +1409,7 @@ const AmpPanel: React.FC = () => {
                           background: skin.nbBadgeDotBg,
                         }}
                       />
-                      NB • SITAR
+                      NB • RAGA
                     </div>
 
                     {/* Botón de monitor */}
@@ -1667,7 +1667,7 @@ const AmpPanel: React.FC = () => {
                     />
 
                     <Knob
-                      label="Sitar"
+                      label="Raga"
                       min={0}
                       max={100}
                       value={sitarAmount * 100}
