@@ -390,7 +390,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     ragaResonance,
     ragaDroneLevel,
     ragaColor,
- 
+
   ]);
 
   const applySettings = useCallback((s: EngineSettings) => {
@@ -468,16 +468,22 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const offlinePreviewAnimRef = useRef<number | null>(null);
   const droneEnvAmountRef = useRef<GainNode | null>(null);
   const droneGainRef = useRef<GainNode | null>(null);
-const [takes, setTakes] = useState<Take[]>([]);
-const activeTakeIdRef = useRef<string | null>(null);
+  const [takes, setTakes] = useState<Take[]>([]);
+  const activeTakeIdRef = useRef<string | null>(null);
+
+  const driveDryRef = useRef<GainNode | null>(null);
+  const driveWetRef = useRef<GainNode | null>(null);
+  const postDriveLPRef = useRef<BiquadFilterNode | null>(null);
+  const postDriveHPRef = useRef<BiquadFilterNode | null>(null);
+  const antiRfPreDriveRef = useRef<BiquadFilterNode | null>(null);
 
 
 
 
 
-// punch-in session
-const punchCursorSecRef = useRef<number>(0);
-const isPunchArmedRef = useRef<boolean>(false);
+  // punch-in session
+  const punchCursorSecRef = useRef<number>(0);
+  const isPunchArmedRef = useRef<boolean>(false);
 
   const compNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const compDryRef = useRef<GainNode | null>(null);
@@ -517,8 +523,8 @@ const isPunchArmedRef = useRef<boolean>(false);
   // Buffer procesado offline
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
   const [processedWaveform, setProcessedWaveform] = useState<number[] | null>(null);
-const [activeTakeId, setActiveTakeId] = useState<string | null>(null);
-const [isPunchArmed, setIsPunchArmed] = useState(false);
+  const [activeTakeId, setActiveTakeId] = useState<string | null>(null);
+  const [isPunchArmed, setIsPunchArmed] = useState(false);
 
   // Volumen de preview offline (0–1)
   const [offlineVolume, setOfflineVolume] = useState(1.0);
@@ -625,9 +631,9 @@ const [isPunchArmed, setIsPunchArmed] = useState(false);
     setMetronomeOn(false);
   }, []);
 
-useEffect(() => { activeTakeIdRef.current = activeTakeId; }, [activeTakeId]);
-const takesRef = useRef<Take[]>([]);
-useEffect(() => { takesRef.current = takes; }, [takes]);
+  useEffect(() => { activeTakeIdRef.current = activeTakeId; }, [activeTakeId]);
+  const takesRef = useRef<Take[]>([]);
+  useEffect(() => { takesRef.current = takes; }, [takes]);
 
   // crear / actualizar intervalo del metrónomo
   useEffect(() => {
@@ -670,8 +676,8 @@ useEffect(() => { takesRef.current = takes; }, [takes]);
   }, [audioContext, bpm, metronomeOn, metronomeVolume]);
 
   useEffect(() => {
-  isPunchArmedRef.current = isPunchArmed;
-}, [isPunchArmed]);
+    isPunchArmedRef.current = isPunchArmed;
+  }, [isPunchArmed]);
   // ---------- PLAY / EXPORT DEL PROCESADO OFFLINE ----------
 
   const playProcessed = useCallback(() => {
@@ -849,23 +855,49 @@ useEffect(() => { takesRef.current = takes; }, [takes]);
     ampGainNode.gain.value = ampGain;
     ampGainNodeRef.current = ampGainNode;
 
+    // ✅ Band-limit “de guitarra” ANTES del drive (mata RF antes de la no-linealidad)
+    const preDriveHP = ctx.createBiquadFilter();
+    preDriveHP.type = 'highpass';
+    preDriveHP.frequency.value = 85;  // 70..120 Hz
+    preDriveHP.Q.value = 0.707;
+
+    const preDriveLP = ctx.createBiquadFilter();
+    preDriveLP.type = 'lowpass';
+    preDriveLP.frequency.value = 4500; // 4500..6500 (clave contra “radio”)
+    preDriveLP.Q.value = 0.707;
+
+
     const driveNode = ctx.createWaveShaper();
     driveNode.curve = makeDriveCurve(driveMode, driveEnabled ? driveAmount : 0);
     driveNode.oversample = '4x';
     driveNodeRef.current = driveNode;
     // ✅ anti-radio antes del drive (mata HF antes de distorsionar)
-const antiRfPreDrive = ctx.createBiquadFilter();
-antiRfPreDrive.type = 'lowpass';
-antiRfPreDrive.frequency.value = 9500; // probá 8000..12000
-antiRfPreDrive.Q.value = 0.7;
+    const antiRfPreDrive = ctx.createBiquadFilter();
+    antiRfPreDrive.type = 'lowpass';
+    antiRfPreDrive.frequency.value = 9500; // probá 8000..12000
+    antiRfPreDrive.Q.value = 0.7;
+    antiRfPreDriveRef.current = antiRfPreDrive;
 
 
     const toneFilter = ctx.createBiquadFilter();
     toneFilter.type = 'lowpass';
+
     const minFreq = 200;
     const maxFreq = 16000;
     toneFilter.frequency.value = minFreq + ampTone * (maxFreq - minFreq);
     toneFilterRef.current = toneFilter;
+
+    // ✅ TRUE BYPASS del drive (para que el shaper no procese nada cuando está OFF)
+    const driveDry = ctx.createGain();
+    const driveWet = ctx.createGain();
+    driveDry.gain.value = 1.0;
+    driveWet.gain.value = 0.0;
+
+    const driveOut = ctx.createGain();
+
+    driveDryRef.current = driveDry;
+    driveWetRef.current = driveWet;
+
 
 
     // === COMPRESSOR (true bypass + parallel mix) ===
@@ -1051,9 +1083,36 @@ antiRfPreDrive.Q.value = 0.7;
     midFilter.connect(trebleFilter);
     trebleFilter.connect(ampGainNode);
 
-ampGainNode.connect(antiRfPreDrive);
-antiRfPreDrive.connect(driveNode);
-driveNode.connect(toneFilter);
+    // ✅ NUEVO orden: band-limit antes del drive
+    ampGainNode.connect(preDriveHP);
+    preDriveHP.connect(preDriveLP);
+    // split: dry directo + wet al shaper
+    preDriveLP.connect(driveDry);
+    // ✅ PAD antes del shaper (baja demodulación / “radio” cuando hay drive)
+    const drivePad = ctx.createGain();
+    drivePad.gain.value = 0.6; // probá 0.4..0.8
+
+    preDriveLP.connect(drivePad);
+    drivePad.connect(antiRfPreDrive);
+
+    antiRfPreDrive.connect(driveNode);
+    driveNode.connect(driveWet);
+
+    // sum
+    driveDry.connect(driveOut);
+    driveWet.connect(driveOut);
+
+    // ✅ filtro post-drive (mata fizz + restos de “radio”)
+    const postDriveLP = ctx.createBiquadFilter();
+    postDriveLP.type = 'lowpass';
+    postDriveLP.frequency.value = 5500; // probá 4500..8000
+    postDriveLP.Q.value = 0.707;
+
+    // a tone (ahora pasa por postDriveLP)
+    driveOut.connect(postDriveLP);
+    postDriveLP.connect(toneFilter);
+
+
 
     // ======================================================
     // 🎵 OCTAVE PEDAL (OFFLINE)
@@ -1111,58 +1170,58 @@ driveNode.connect(toneFilter);
 
     // guardamos refs para update
     octaveOscRef.current = octaveOsc; // si querés reutilizar ref, o creá una ref nueva
-// === VALVE CRUNCH (true bypass con dry/wet) ===
+    // === VALVE CRUNCH (true bypass con dry/wet) ===
 
-// 1) Wet chain (efecto)
-const valveShaper = ctx.createWaveShaper();
-valveShaper.oversample = '4x';
-valveShaperRef.current = valveShaper;
+    // 1) Wet chain (efecto)
+    const valveShaper = ctx.createWaveShaper();
+    valveShaper.oversample = '4x';
+    valveShaperRef.current = valveShaper;
 
-const valveToneFilter = ctx.createBiquadFilter();
-valveToneFilter.type = 'lowpass';
-valveToneRef.current = valveToneFilter;
+    const valveToneFilter = ctx.createBiquadFilter();
+    valveToneFilter.type = 'lowpass';
+    valveToneRef.current = valveToneFilter;
 
-const valveLevelGain = ctx.createGain();
-valveLevelRef.current = valveLevelGain;
+    const valveLevelGain = ctx.createGain();
+    valveLevelRef.current = valveLevelGain;
 
-// ✅ anti-radio antes de la saturación
-const antiRfLP = ctx.createBiquadFilter();
-antiRfLP.type = 'lowpass';
-antiRfLP.frequency.value = 9500; // probá 8000..12000
-antiRfLP.Q.value = 0.7;
+    // ✅ anti-radio antes de la saturación
+    const antiRfLP = ctx.createBiquadFilter();
+    antiRfLP.type = 'lowpass';
+    antiRfLP.frequency.value = 9500; // probá 8000..12000
+    antiRfLP.Q.value = 0.7;
 
-// Conexión interna del efecto (WET)
-antiRfLP.connect(valveShaper);
-valveShaper.connect(valveToneFilter);
-valveToneFilter.connect(valveLevelGain);
+    // Conexión interna del efecto (WET)
+    antiRfLP.connect(valveShaper);
+    valveShaper.connect(valveToneFilter);
+    valveToneFilter.connect(valveLevelGain);
 
-// 2) Router dry / wet
-const valveDry = ctx.createGain();
-valveDry.gain.value = 1.0;
+    // 2) Router dry / wet
+    const valveDry = ctx.createGain();
+    valveDry.gain.value = 1.0;
 
-const valveWet = ctx.createGain();
-valveWet.gain.value = 0.0;
+    const valveWet = ctx.createGain();
+    valveWet.gain.value = 0.0;
 
-valveDryRef.current = valveDry;
-valveWetRef.current = valveWet;
+    valveDryRef.current = valveDry;
+    valveWetRef.current = valveWet;
 
-// 3) Split desde preSitarNode
-preSitarNode.connect(valveDry);
-preSitarNode.connect(antiRfLP); // ✅ la entrada al efecto pasa SI o SI por el filtro
+    // 3) Split desde preSitarNode
+    preSitarNode.connect(valveDry);
+    preSitarNode.connect(antiRfLP); // ✅ la entrada al efecto pasa SI o SI por el filtro
 
-// salida del efecto al wet
-valveLevelGain.connect(valveWet);
+    // salida del efecto al wet
+    valveLevelGain.connect(valveWet);
 
-// 4) SUMA
-const valveOut = ctx.createGain();
-valveDry.connect(valveOut);
-valveWet.connect(valveOut);
+    // 4) SUMA
+    const valveOut = ctx.createGain();
+    valveDry.connect(valveOut);
+    valveWet.connect(valveOut);
 
-// 5) Seguir desde valveOut
-preSitarNode = valveOut;
+    // 5) Seguir desde valveOut
+    preSitarNode = valveOut;
 
 
-  
+
     // ======================================================
     // 🎵 OCTAVE PEDAL (MAIN graph) — ring-mod simple
     // ======================================================
@@ -1371,35 +1430,55 @@ preSitarNode = valveOut;
     ragaDrive.oversample = '4x';
     ragaDrive.curve = makeDriveCurve('crunch', 0.25);
 
+    // ON/OFF real por useEffect
     const ragaMix = ctx.createGain();
-    ragaMix.gain.value = 0; // ON/OFF real por useEffect
+    ragaMix.gain.value = 0;
+
+    // ✅ Band-limit ANTES del Raga (mata RF antes de resonancias + drive)
+    const preRagaHP = ctx.createBiquadFilter();
+    preRagaHP.type = 'highpass';
+    preRagaHP.frequency.value = 120; // 80..160
+    preRagaHP.Q.value = 0.707;
+
+    const preRagaLP = ctx.createBiquadFilter();
+    preRagaLP.type = 'lowpass';
+    preRagaLP.frequency.value = 3600; // 3800..6000 (si hay radio, bajá más)
+    preRagaLP.Q.value = 0.707;
+
+    // ✅ anti-radio antes del drive del Raga (la no-linealidad demodula RF)
+    const preRagaDriveLP = ctx.createBiquadFilter();
+    preRagaDriveLP.type = 'lowpass';
+    preRagaDriveLP.frequency.value = 5200; // 4500..6500
+    preRagaDriveLP.Q.value = 0.707;
+
+    // ✅ filtro final antes de volver al bus (limpia fizz y restos)
+    const ragaAntiRF = ctx.createBiquadFilter();
+    ragaAntiRF.type = 'lowpass';
+    ragaAntiRF.frequency.value = 6000;
+    ragaAntiRF.Q.value = 0.7;
 
     // input del Raga: desde el bus preDelayInput (post flanger/phaser/octave/valve)
-    preDelayInput.connect(ragaRes1);
+    preDelayInput.connect(preRagaHP);
+    preRagaHP.connect(preRagaLP);
+    preRagaLP.connect(ragaRes1);
+
     ragaRes1.connect(ragaRes2);
-    ragaRes2.connect(ragaDrive);
+    ragaRes2.connect(preRagaDriveLP);
+    preRagaDriveLP.connect(ragaDrive);
+
     ragaDrive.connect(ragaMix);
-    const ragaAntiRF = ctx.createBiquadFilter();
-ragaAntiRF.type = 'lowpass';
-ragaAntiRF.frequency.value = 6000;
-ragaAntiRF.Q.value = 0.7;
-
-ragaMix.disconnect();
-ragaMix.connect(ragaAntiRF);
-ragaAntiRF.connect(preDelayGain);
-
+    ragaMix.connect(ragaAntiRF);
 
     // ✅ IMPORTANTE: sumarlo SIEMPRE al MISMO BUS que el resto (preDelayGain)
     // así el delay y la reverb también lo afectan
- 
+    ragaAntiRF.connect(preDelayGain);
 
     // refs
     ragaFilterRef.current = ragaRes1;
     ragaGainRef.current = ragaMix;
 
     // si querés controlar el 2do resonador también:
-    ragaSympatheticRef.current = ragaRes2; // (si no querés, creá otra ref)
-
+    ragaSympatheticRef.current = ragaRes2;
 
 
     // Alimentar el camino WET (jawari + resonancias)
@@ -1640,8 +1719,21 @@ ragaAntiRF.connect(preDelayGain);
         reverb.buffer = getReverbImpulse(offlineCtx as unknown as AudioContext);
 
         // === Conexiones ===
-        src.connect(inputGain);
-        inputGain.connect(driveNode);
+        // ✅ band-limit antes del drive (offline también)
+        const preDriveHP = offlineCtx.createBiquadFilter();
+        preDriveHP.type = 'highpass';
+        preDriveHP.frequency.value = 70;
+        preDriveHP.Q.value = 0.707;
+
+        const preDriveLP = offlineCtx.createBiquadFilter();
+        preDriveLP.type = 'lowpass';
+        preDriveLP.frequency.value = 5200;
+        preDriveLP.Q.value = 0.707;
+
+        inputGain.connect(preDriveHP);
+        preDriveHP.connect(preDriveLP);
+        preDriveLP.connect(driveNode);
+
         driveNode.connect(toneFilter);
         // ======================================================
         // 🔗 FX CHAIN OFFLINE (octave + phaser)
@@ -1836,92 +1928,92 @@ ragaAntiRF.connect(preDelayGain);
         }
       };
 
-   mr.onstop = async () => {
-  const blob = new Blob(recordedChunksRef.current, { type: 'audio/wav' });
-  recordedChunksRef.current = [];
+      mr.onstop = async () => {
+        const blob = new Blob(recordedChunksRef.current, { type: 'audio/wav' });
+        recordedChunksRef.current = [];
 
-  const ctx = getOrCreateAudioContext();
-  const punchBufFull = await blobToAudioBuffer(ctx, blob);
-  const punchUrl = URL.createObjectURL(blob);
+        const ctx = getOrCreateAudioContext();
+        const punchBufFull = await blobToAudioBuffer(ctx, blob);
+        const punchUrl = URL.createObjectURL(blob);
 
-  const doPunch = isPunchArmedRef.current && !!activeTakeIdRef.current;
+        const doPunch = isPunchArmedRef.current && !!activeTakeIdRef.current;
 
-  // --- TAKE NORMAL ---
-  if (!doPunch) {
-    const take: Take = {
-      id: crypto.randomUUID(),
-      name: `Take ${takesRef.current.length + 1}`,
-      blob,
-      url: punchUrl,
-      durationSec: punchBufFull.duration,
-    };
+        // --- TAKE NORMAL ---
+        if (!doPunch) {
+          const take: Take = {
+            id: crypto.randomUUID(),
+            name: `Take ${takesRef.current.length + 1}`,
+            blob,
+            url: punchUrl,
+            durationSec: punchBufFull.duration,
+          };
 
-    setTakes((prev) => [...prev, take]);
-    setActiveTakeId(take.id);
-    setStatus('Take guardado ✅');
-    return;
-  }
+          setTakes((prev) => [...prev, take]);
+          setActiveTakeId(take.id);
+          setStatus('Take guardado ✅');
+          return;
+        }
 
-  // --- PUNCH REPLACE ---
-  setStatus('Aplicando punch-in…');
+        // --- PUNCH REPLACE ---
+        setStatus('Aplicando punch-in…');
 
-  const cursorSec = Math.max(0, punchCursorSecRef.current);
+        const cursorSec = Math.max(0, punchCursorSecRef.current);
 
-  const baseId = activeTakeIdRef.current!;
-  const baseTake = takesRef.current.find((t) => t.id === baseId);
+        const baseId = activeTakeIdRef.current!;
+        const baseTake = takesRef.current.find((t) => t.id === baseId);
 
-  if (!baseTake) {
-    // fallback si no hay base
-    const fallback: Take = {
-      id: crypto.randomUUID(),
-      name: `Take ${takesRef.current.length + 1}`,
-      blob,
-      url: punchUrl,
-      durationSec: punchBufFull.duration,
-    };
+        if (!baseTake) {
+          // fallback si no hay base
+          const fallback: Take = {
+            id: crypto.randomUUID(),
+            name: `Take ${takesRef.current.length + 1}`,
+            blob,
+            url: punchUrl,
+            durationSec: punchBufFull.duration,
+          };
 
-    setTakes((prev) => [...prev, fallback]);
-    setActiveTakeId(fallback.id);
-    setStatus('Take guardado ✅ (no se encontró base para punch)');
-    setIsPunchArmed(false);
-    return;
-  }
+          setTakes((prev) => [...prev, fallback]);
+          setActiveTakeId(fallback.id);
+          setStatus('Take guardado ✅ (no se encontró base para punch)');
+          setIsPunchArmed(false);
+          return;
+        }
 
-  // decodificar base take
-  const baseBuf = await blobToAudioBuffer(ctx, baseTake.blob);
-  const safeCursor = Math.min(cursorSec, baseBuf.duration);
+        // decodificar base take
+        const baseBuf = await blobToAudioBuffer(ctx, baseTake.blob);
+        const safeCursor = Math.min(cursorSec, baseBuf.duration);
 
-  // ojo: cortamos el punch desde el mismo cursor, así el insert arranca alineado
-  const insertBuf = sliceAudioBuffer(ctx, punchBufFull, safeCursor);
+        // ojo: cortamos el punch desde el mismo cursor, así el insert arranca alineado
+        const insertBuf = sliceAudioBuffer(ctx, punchBufFull, safeCursor);
 
-  const merged = spliceReplaceWithCrossfade(ctx, baseBuf, insertBuf, safeCursor, 12);
+        const merged = spliceReplaceWithCrossfade(ctx, baseBuf, insertBuf, safeCursor, 12);
 
-  const mergedBlob = audioBufferToWavBlob(merged);
-  const mergedUrl = URL.createObjectURL(mergedBlob);
+        const mergedBlob = audioBufferToWavBlob(merged);
+        const mergedUrl = URL.createObjectURL(mergedBlob);
 
-  // update state (SYNC) sin async
-  setTakes((prev) =>
-    prev.map((t) =>
-      t.id === baseTake.id
-        ? {
-            ...t,
-            blob: mergedBlob,
-            url: mergedUrl,
-            durationSec: merged.duration,
-            name: `${t.name} (Punch)`,
-          }
-        : t
-    )
-  );
+        // update state (SYNC) sin async
+        setTakes((prev) =>
+          prev.map((t) =>
+            t.id === baseTake.id
+              ? {
+                ...t,
+                blob: mergedBlob,
+                url: mergedUrl,
+                durationSec: merged.duration,
+                name: `${t.name} (Punch)`,
+              }
+              : t
+          )
+        );
 
-  setActiveTakeId(baseTake.id);
-  setStatus(`Punch aplicado en ${safeCursor.toFixed(2)}s ✅`);
-  setIsPunchArmed(false);
+        setActiveTakeId(baseTake.id);
+        setStatus(`Punch aplicado en ${safeCursor.toFixed(2)}s ✅`);
+        setIsPunchArmed(false);
 
-  // liberar URLs viejas
-  try { URL.revokeObjectURL(baseTake.url); } catch {}
-  try { URL.revokeObjectURL(punchUrl); } catch {}
-};
+        // liberar URLs viejas
+        try { URL.revokeObjectURL(baseTake.url); } catch { }
+        try { URL.revokeObjectURL(punchUrl); } catch { }
+      };
 
 
 
@@ -1979,6 +2071,23 @@ ragaAntiRF.connect(preDelayGain);
     compressorMix,
   ]);
 
+  useEffect(() => {
+    if (!audioContext) return;
+
+    const dry = driveDryRef.current;
+    const wet = driveWetRef.current;
+    if (!dry || !wet) return;
+
+    const t = audioContext.currentTime;
+
+    if (!driveEnabled) {
+      wet.gain.setTargetAtTime(0, t, 0.01);
+      dry.gain.setTargetAtTime(1, t, 0.01);
+    } else {
+      wet.gain.setTargetAtTime(1, t, 0.01);
+      dry.gain.setTargetAtTime(0, t, 0.01);
+    }
+  }, [audioContext, driveEnabled]);
 
   useEffect(() => {
     if (!audioContext) return;
@@ -2185,18 +2294,18 @@ ragaAntiRF.connect(preDelayGain);
   };
 
 
-// ✅ PEGAR ACÁ (ANTES del startPlaybackAndRecording)
-const armPunchIn = useCallback((cursorSec: number) => {
-  punchCursorSecRef.current = cursorSec;
-  setIsPunchArmed(true);
-  setStatus(`Punch armado en ${cursorSec.toFixed(2)}s`);
-}, [setIsPunchArmed, setStatus]);
+  // ✅ PEGAR ACÁ (ANTES del startPlaybackAndRecording)
+  const armPunchIn = useCallback((cursorSec: number) => {
+    punchCursorSecRef.current = cursorSec;
+    setIsPunchArmed(true);
+    setStatus(`Punch armado en ${cursorSec.toFixed(2)}s`);
+  }, [setIsPunchArmed, setStatus]);
 
-const disarmPunchIn = useCallback(() => {
-  setIsPunchArmed(false);
-  punchCursorSecRef.current = 0;
-  setStatus('Punch desarmado');
-}, [setIsPunchArmed, setStatus]);
+  const disarmPunchIn = useCallback(() => {
+    setIsPunchArmed(false);
+    punchCursorSecRef.current = 0;
+    setStatus('Punch desarmado');
+  }, [setIsPunchArmed, setStatus]);
 
 
   const startPlaybackAndRecording = useCallback(async () => {
@@ -2717,10 +2826,10 @@ const disarmPunchIn = useCallback(() => {
   // 🔥 Actualización en vivo del pedal Raga
 
   const value: AudioEngineContextValue = {
- // ✅ TAKES (ESTO ES LO NUEVO)
-  takes,
-  activeTakeId,
-  setActiveTakeId,
+    // ✅ TAKES (ESTO ES LO NUEVO)
+    takes,
+    activeTakeId,
+    setActiveTakeId,
 
     status,
     isInputReady,
@@ -2781,9 +2890,9 @@ const disarmPunchIn = useCallback(() => {
     mixAmount,
     setMixAmount,
 
-isPunchArmed,
-armPunchIn,
-disarmPunchIn,
+    isPunchArmed,
+    armPunchIn,
+    disarmPunchIn,
 
     // Amp
     ampGain,
