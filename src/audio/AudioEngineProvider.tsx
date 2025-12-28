@@ -853,6 +853,12 @@ useEffect(() => { takesRef.current = takes; }, [takes]);
     driveNode.curve = makeDriveCurve(driveMode, driveEnabled ? driveAmount : 0);
     driveNode.oversample = '4x';
     driveNodeRef.current = driveNode;
+    // ✅ anti-radio antes del drive (mata HF antes de distorsionar)
+const antiRfPreDrive = ctx.createBiquadFilter();
+antiRfPreDrive.type = 'lowpass';
+antiRfPreDrive.frequency.value = 9500; // probá 8000..12000
+antiRfPreDrive.Q.value = 0.7;
+
 
     const toneFilter = ctx.createBiquadFilter();
     toneFilter.type = 'lowpass';
@@ -935,9 +941,9 @@ useEffect(() => { takesRef.current = takes; }, [takes]);
     ragaSymGain.gain.value = 0; // se activa solo con el pedal
 
     // Conexión en paralelo
-    toneFilter.connect(ragaSym);
-    ragaSym.connect(ragaSymGain);
-    ragaSymGain.connect(masterGain);
+    // toneFilter.connect(ragaSym);
+    // ragaSym.connect(ragaSymGain);
+    // ragaSymGain.connect(masterGain);
 
     // Referencias opcionales
     ragaSympatheticRef.current = ragaSym;
@@ -1045,8 +1051,10 @@ useEffect(() => { takesRef.current = takes; }, [takes]);
     midFilter.connect(trebleFilter);
     trebleFilter.connect(ampGainNode);
 
-    ampGainNode.connect(driveNode);
-    driveNode.connect(toneFilter);
+ampGainNode.connect(antiRfPreDrive);
+antiRfPreDrive.connect(driveNode);
+driveNode.connect(toneFilter);
+
     // ======================================================
     // 🎵 OCTAVE PEDAL (OFFLINE)
     // ======================================================
@@ -1103,59 +1111,58 @@ useEffect(() => { takesRef.current = takes; }, [takes]);
 
     // guardamos refs para update
     octaveOscRef.current = octaveOsc; // si querés reutilizar ref, o creá una ref nueva
+// === VALVE CRUNCH (true bypass con dry/wet) ===
+
+// 1) Wet chain (efecto)
+const valveShaper = ctx.createWaveShaper();
+valveShaper.oversample = '4x';
+valveShaperRef.current = valveShaper;
+
+const valveToneFilter = ctx.createBiquadFilter();
+valveToneFilter.type = 'lowpass';
+valveToneRef.current = valveToneFilter;
+
+const valveLevelGain = ctx.createGain();
+valveLevelRef.current = valveLevelGain;
+
+// ✅ anti-radio antes de la saturación
+const antiRfLP = ctx.createBiquadFilter();
+antiRfLP.type = 'lowpass';
+antiRfLP.frequency.value = 9500; // probá 8000..12000
+antiRfLP.Q.value = 0.7;
+
+// Conexión interna del efecto (WET)
+antiRfLP.connect(valveShaper);
+valveShaper.connect(valveToneFilter);
+valveToneFilter.connect(valveLevelGain);
+
+// 2) Router dry / wet
+const valveDry = ctx.createGain();
+valveDry.gain.value = 1.0;
+
+const valveWet = ctx.createGain();
+valveWet.gain.value = 0.0;
+
+valveDryRef.current = valveDry;
+valveWetRef.current = valveWet;
+
+// 3) Split desde preSitarNode
+preSitarNode.connect(valveDry);
+preSitarNode.connect(antiRfLP); // ✅ la entrada al efecto pasa SI o SI por el filtro
+
+// salida del efecto al wet
+valveLevelGain.connect(valveWet);
+
+// 4) SUMA
+const valveOut = ctx.createGain();
+valveDry.connect(valveOut);
+valveWet.connect(valveOut);
+
+// 5) Seguir desde valveOut
+preSitarNode = valveOut;
 
 
-    // === VALVE CRUNCH (true bypass con dry/wet) ===
-
-    // 1) Wet chain (efecto)
-    const valveShaper = ctx.createWaveShaper();
-    valveShaper.oversample = '4x';
-    valveShaperRef.current = valveShaper;
-
-    const valveToneFilter = ctx.createBiquadFilter();
-    valveToneFilter.type = 'lowpass';
-    valveToneRef.current = valveToneFilter;
-
-    const valveLevelGain = ctx.createGain();
-    valveLevelRef.current = valveLevelGain;
-
-    // Conexión interna del efecto
-    valveShaper.connect(valveToneFilter);
-    valveToneFilter.connect(valveLevelGain);
-
-    // 2) Router dry / wet
-    const valveDry = ctx.createGain();
-    valveDry.gain.value = 1.0;
-
-    const valveWet = ctx.createGain();
-    valveWet.gain.value = 0.0;
-
-    // Guardar refs para togglear ON/OFF en useEffect
-    valveDryRef.current = valveDry;
-    valveWetRef.current = valveWet;
-
-    // 3) Entrada desde toneFilter: se divide a dry y al efecto
-    preSitarNode.connect(valveDry);
-    preSitarNode.connect(valveShaper);
-
-    // salida del efecto entra al wet
-    valveLevelGain.connect(valveWet);
-
-    // 4) SUMA (mix out)
-    const valveOut = ctx.createGain();
-    valveDry.connect(valveOut);
-    valveWet.connect(valveOut);
-
-    // 5) Desde ahora, el grafo sigue desde valveOut
-    preSitarNode = valveOut;
-
-    // // mix out
-    // valveDry.connect(valveOut);
-    // valveWet.connect(valveOut);
-
-    // // desde ahora, el grafo sigue desde valveOut
-    // preSitarNode = valveOut;
-
+  
     // ======================================================
     // 🎵 OCTAVE PEDAL (MAIN graph) — ring-mod simple
     // ======================================================
@@ -1372,10 +1379,19 @@ useEffect(() => { takesRef.current = takes; }, [takes]);
     ragaRes1.connect(ragaRes2);
     ragaRes2.connect(ragaDrive);
     ragaDrive.connect(ragaMix);
+    const ragaAntiRF = ctx.createBiquadFilter();
+ragaAntiRF.type = 'lowpass';
+ragaAntiRF.frequency.value = 6000;
+ragaAntiRF.Q.value = 0.7;
+
+ragaMix.disconnect();
+ragaMix.connect(ragaAntiRF);
+ragaAntiRF.connect(preDelayGain);
+
 
     // ✅ IMPORTANTE: sumarlo SIEMPRE al MISMO BUS que el resto (preDelayGain)
     // así el delay y la reverb también lo afectan
-    ragaMix.connect(preDelayGain);
+ 
 
     // refs
     ragaFilterRef.current = ragaRes1;
@@ -2376,19 +2392,19 @@ const disarmPunchIn = useCallback(() => {
 
     // 2) COLOR = mueve las 2 resonancias (cambia “nota” del timbre)
     const base1 = 900 + ragaColor * 3200;         // 900..4100
-    const base2 = 4200 + ragaColor * 5200;        // 4200..9400
+    const base2 = 2800 + ragaColor * 2200;        // 4200..9400
     res1.frequency.setTargetAtTime(base1, t, 0.02);
     res2.frequency.setTargetAtTime(base2, t, 0.02);
 
     // 3) RESONANCE = Q + dB (acá aparece el carácter)
     const q1 = 3 + ragaResonance * 22;            // 3..25
-    const q2 = 6 + ragaResonance * 26;            // 6..32
+    const q2 = 3 + ragaResonance * 6;            // 6..32
     res1.Q.setTargetAtTime(q1, t, 0.02);
     res2.Q.setTargetAtTime(q2, t, 0.02);
 
     // ganancia de resonancia (peaking gain en dB)
     const g1 = 2 + ragaResonance * 16;            // 2..18 dB
-    const g2 = 1 + ragaResonance * 14;            // 1..15 dB
+    const g2 = 1 + ragaResonance * 6;           // 1..15 dB
     res1.gain.setTargetAtTime(g1, t, 0.02);
     res2.gain.setTargetAtTime(g2, t, 0.02);
   }, [audioContext, ragaEnabled, ragaResonance, ragaDroneLevel, ragaColor]);
