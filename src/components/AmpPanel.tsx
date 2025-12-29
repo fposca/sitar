@@ -222,159 +222,162 @@ const PRESETS: Record<
     },
   },
   desertLead: {
-    label: 'Desert Lead',
-    description: 'Lead vocal, ancho, delay fantasma.',
-    settings: {
-      // ✅ COMPRESSOR (defaults)
-      compressorEnabled: false,
-      compressorThreshold: -18, // dB
-      compressorRatio: 4, // 1..20
-      compressorAttack: 0.01, // seconds
-      compressorRelease: 0.2, // seconds
-      compressorKnee: 12, // dB
-      compressorMakeup: 1.0, // linear gain (1 = 0dB)
-      compressorMix: 1.0, // 0..1
+     label: 'Rock Crunch',
+  description: 'Crunch clásico, definido, sin delay ni raga.',
+  settings: {
+    // ✅ COMPRESSOR (suave para emparejar)
+    compressorEnabled: true,
+    compressorThreshold: -22,
+    compressorRatio: 3,
+    compressorAttack: 0.01,
+    compressorRelease: 0.18,
+    compressorKnee: 12,
+    compressorMakeup: 1.05,
+    compressorMix: 0.65,
 
-      ampGain: 1.25,
-      ampTone: 0.62,
-      ampMaster: 1.2,
-      bassAmount: 0.5,
-      midAmount: 0.65,
-      trebleAmount: 0.6,
-      presenceAmount: 0.65,
-      driveAmount: 0.58,
-      driveEnabled: true,
+    // AMP / EQ
+    ampGain: 1.15,
+    ampTone: 0.52,
+    ampMaster: 1.15,
+    bassAmount: 0.52,
+    midAmount: 0.62,
+    trebleAmount: 0.55,
+    presenceAmount: 0.58,
 
-      // 🔻 Delay mínimo
-      delayEnabled: true,
-      delayTimeMs: 320,
-      feedbackAmount: 0.18,
-      mixAmount: 0.14,
+    // DRIVE (crunch controlado)
+    driveAmount: 0.48,
+    driveEnabled: true,
 
-      reverbAmount: 0.4,
+    // ❌ DELAY OFF
+    delayEnabled: false,
+    delayTimeMs: 300,
+    feedbackAmount: 0.0,
+    mixAmount: 0.0,
 
-      sitarAmount: 0.25,
-      sitarMode: 'sharp',
+    // REVERB leve (ambiente)
+    reverbAmount: 0.22,
 
-      // 🌊 Phaser leve
-      phaserEnabled: true,
-      phaserRate: 0.12,
-      phaserDepth: 0.22,
-      phaserFeedback: 0.08,
-      phaserMix: 0.25,
-      phaserCenter: 0.55,
+    // ❌ SITAR OFF (clave anti “radio”)
+    sitarAmount: 0.0,
+    sitarMode: 'exotic', // da igual si amount=0
 
-      // 🌫️ Flanger apenas presente
-      flangerEnabled: true,
-      flangerRate: 0.18,
-      flangerDepth: 0.2,
-      flangerMix: 0.2,
-      flangerFeedback: 0.08,
+    // ❌ MODS OFF (phaser/flanger)
+    phaserEnabled: false,
+    phaserRate: 0.12,
+    phaserDepth: 0.0,
+    phaserFeedback: 0.0,
+    phaserMix: 0.0,
+    phaserCenter: 0.5,
 
-      // Octave off
-      octaveEnabled: false,
-      octaveTone: 0.5,
-      octaveLevel: 1.0,
-      octaveMix: 0.0,
+    flangerEnabled: false,
+    flangerRate: 0.18,
+    flangerDepth: 0.0,
+    flangerMix: 0.0,
+    flangerFeedback: 0.0,
 
-      // Valve listo pero apagado
-      valveEnabled: false,
-      valveDrive: 0.5,
-      valveTone: 0.55,
-      valveLevel: 1.1,
-      valveMode: 'crunch',
+    // ❌ OCTAVE OFF
+    octaveEnabled: false,
+    octaveTone: 0.5,
+    octaveLevel: 1.0,
+    octaveMix: 0.0,
 
-      // Raga listo
-      ragaEnabled: false,
-      ragaResonance: 0.4,
-      ragaDroneLevel: 0.3,
-      ragaColor: 0.45,
-      isPunchArmed: false,
-      armPunchIn: function (cursorSec: number): void {
-        throw new Error('Function not implemented.');
-      },
-      setIsPunchArmed: function (v: boolean): void {
-        throw new Error('Function not implemented.');
-      }
-    },
+    // ✅ Valve apagado (por ahora)
+    valveEnabled: false,
+    valveDrive: 0.55,
+    valveTone: 0.55,
+    valveLevel: 1.0,
+    valveMode: 'crunch',
+
+    // ❌ RAGA OFF (y todo en cero)
+    ragaEnabled: false,
+    ragaResonance: 0.0,
+    ragaDroneLevel: 0.0,
+    ragaColor: 0.0,
+
+    // (si tu EngineSettings todavía exige esto, dejalo igual que ya lo tenías)
+    isPunchArmed: false,
+    armPunchIn: function (): void { throw new Error('Function not implemented.'); },
+    setIsPunchArmed: function (): void { throw new Error('Function not implemented.'); },
   },
+},
   infernalRaga: {
-    label: 'Infernal Raga',
-    description: 'Ritual oscuro, movimiento interno.',
-    settings: {
-      // ✅ COMPRESSOR (defaults)
-      compressorEnabled: false,
-      compressorThreshold: -18, // dB
-      compressorRatio: 4, // 1..20
-      compressorAttack: 0.01, // seconds
-      compressorRelease: 0.2, // seconds
-      compressorKnee: 12, // dB
-      compressorMakeup: 1.0, // linear gain (1 = 0dB)
-      compressorMix: 1.0, // 0..1
+   label: 'Rock Heavy',
+  description: 'Pesado y tight, sin delay ni raga (anti-radio).',
+  settings: {
+    // ✅ COMPRESSOR (un poco más apretado)
+    compressorEnabled: true,
+    compressorThreshold: -24,
+    compressorRatio: 4,
+    compressorAttack: 0.008,
+    compressorRelease: 0.16,
+    compressorKnee: 14,
+    compressorMakeup: 1.08,
+    compressorMix: 0.7,
 
-      ampGain: 1.5,
-      ampTone: 0.7,
-      ampMaster: 1.3,
-      bassAmount: 0.48,
-      midAmount: 0.6,
-      trebleAmount: 0.75,
-      presenceAmount: 0.8,
-      driveAmount: 0.8,
-      driveEnabled: true,
+    // AMP / EQ (menos agudos + presencia controlada)
+    ampGain: 1.25,
+    ampTone: 0.45,
+    ampMaster: 1.2,
+    bassAmount: 0.5,
+    midAmount: 0.58,
+    trebleAmount: 0.5,
+    presenceAmount: 0.52,
 
-      // 🔻 Delay casi ambiente
-      delayEnabled: true,
-      delayTimeMs: 360,
-      feedbackAmount: 0.2,
-      mixAmount: 0.16,
+    // DRIVE (alto, pero no al mango)
+    driveAmount: 0.72,
+    driveEnabled: true,
 
-      reverbAmount: 0.6,
+    // ❌ DELAY OFF
+    delayEnabled: false,
+    delayTimeMs: 340,
+    feedbackAmount: 0.0,
+    mixAmount: 0.0,
 
-      sitarAmount: 0.6,
-      sitarMode: 'exotic',
+    // REVERB bajita para no embarrar
+    reverbAmount: 0.18,
 
-      // 🌪️ Phaser profundo
-      phaserEnabled: true,
-      phaserRate: 0.18,
-      phaserDepth: 0.35,
-      phaserFeedback: 0.18,
-      phaserMix: 0.35,
-      phaserCenter: 0.6,
+    // ❌ SITAR OFF (muy importante)
+    sitarAmount: 0.0,
+    sitarMode: 'sharp',
 
-      // 🌑 Flanger lento
-      flangerEnabled: true,
-      flangerRate: 0.1,
-      flangerDepth: 0.3,
-      flangerMix: 0.25,
-      flangerFeedback: 0.18,
+    // ❌ MODS OFF
+    phaserEnabled: false,
+    phaserRate: 0.15,
+    phaserDepth: 0.0,
+    phaserFeedback: 0.0,
+    phaserMix: 0.0,
+    phaserCenter: 0.5,
 
-      // Octave off
-      octaveEnabled: false,
-      octaveTone: 0.5,
-      octaveLevel: 1.0,
-      octaveMix: 0.0,
+    flangerEnabled: false,
+    flangerRate: 0.1,
+    flangerDepth: 0.0,
+    flangerMix: 0.0,
+    flangerFeedback: 0.0,
 
-      // Valve preparado
-      valveEnabled: false,
-      valveDrive: 0.65,
-      valveTone: 0.45,
-      valveLevel: 1.15,
-      valveMode: 'distortion',
+    // ❌ OCTAVE OFF
+    octaveEnabled: true,
+    octaveTone: 0.5,
+    octaveLevel: 1.0,
+    octaveMix: 0.3,
 
-      // Raga poderoso
-      ragaEnabled: false,
-      ragaResonance: 0.65,
-      ragaDroneLevel: 0.45,
-      ragaColor: 0.6,
-      isPunchArmed: false,
-      armPunchIn: function (cursorSec: number): void {
-        throw new Error('Function not implemented.');
-      },
-      setIsPunchArmed: function (v: boolean): void {
-        throw new Error('Function not implemented.');
-      }
-    },
+    // Valve apagado (si lo prendés, que sea con cuidado)
+    valveEnabled: true,
+    valveDrive: 0.15,
+    valveTone: 0.15,
+    valveLevel: 1.05,
+    valveMode: 'distortion',
+
+    // ❌ RAGA OFF (todo 0)
+    ragaEnabled: false,
+    ragaResonance: 0.0,
+    ragaDroneLevel: 0.0,
+    ragaColor: 0.0,
+
+    isPunchArmed: false,
+    armPunchIn: function (): void { throw new Error('Function not implemented.'); },
+    setIsPunchArmed: function (): void { throw new Error('Function not implemented.'); },
   },
+},
 };
 
 /* ---------- SKINS VISUALES POR PRESET ---------- */
