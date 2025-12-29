@@ -11,7 +11,30 @@ const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
   waveform,
   progress,
 }) => {
-  if (!waveform || waveform.length === 0) {
+  // ✅ useMemo SIEMPRE se ejecuta (fix de Rules of Hooks)
+  const bars = useMemo(() => {
+    if (!waveform || waveform.length === 0) return [];
+
+    const targetBars = 120;
+    const step = Math.max(1, Math.floor(waveform.length / targetBars));
+    const result: number[] = [];
+
+    for (let i = 0; i < waveform.length; i += step) {
+      let peak = 0;
+      for (let j = i; j < i + step && j < waveform.length; j++) {
+        const v = Math.abs(waveform[j]);
+        if (v > peak) peak = v;
+      }
+      result.push(peak);
+    }
+
+    return result;
+  }, [waveform]);
+
+  const clampedProgress = Math.max(0, Math.min(1, progress));
+
+  // UI placeholder cuando no hay waveform
+  if (bars.length === 0) {
     return (
       <div
         style={{
@@ -33,25 +56,6 @@ const WaveformDisplay: React.FC<WaveformDisplayProps> = ({
       </div>
     );
   }
-
-  const bars = useMemo(() => {
-    const targetBars = 120;
-    const step = Math.max(1, Math.floor(waveform.length / targetBars));
-    const result: number[] = [];
-
-    for (let i = 0; i < waveform.length; i += step) {
-      let peak = 0;
-      for (let j = i; j < i + step && j < waveform.length; j++) {
-        const v = Math.abs(waveform[j]);
-        if (v > peak) peak = v;
-      }
-      result.push(peak);
-    }
-
-    return result;
-  }, [waveform]);
-
-  const clampedProgress = Math.max(0, Math.min(1, progress));
 
   return (
     <div
@@ -135,7 +139,7 @@ const OfflineSitarPanel: React.FC = () => {
     processedWaveform,
     offlineVolume,
     setOfflineVolume,
-    offlinePreviewProgress, // 👈 viene del contexto
+    offlinePreviewProgress,
   } = useAudioEngine();
 
   const [file, setFile] = useState<File | null>(null);

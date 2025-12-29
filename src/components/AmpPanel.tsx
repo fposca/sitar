@@ -301,10 +301,10 @@ const PRESETS: Record<
   },
 },
   infernalRaga: {
-   label: 'Rock Heavy',
-  description: 'Pesado y tight, sin delay ni raga (anti-radio).',
+  label: 'Rock Heavy',
+  description: 'Tight y definido, sin drive (cabezal), sin delay ni raga.',
   settings: {
-    // ✅ COMPRESSOR (un poco más apretado)
+    // ✅ COMPRESSOR
     compressorEnabled: true,
     compressorThreshold: -24,
     compressorRatio: 4,
@@ -314,7 +314,7 @@ const PRESETS: Record<
     compressorMakeup: 1.08,
     compressorMix: 0.7,
 
-    // AMP / EQ (menos agudos + presencia controlada)
+    // AMP / EQ
     ampGain: 1.25,
     ampTone: 0.45,
     ampMaster: 1.2,
@@ -323,9 +323,10 @@ const PRESETS: Record<
     trebleAmount: 0.5,
     presenceAmount: 0.52,
 
-    // DRIVE (alto, pero no al mango)
+    // ✅ DRIVE (pero arrancá OFF)
     driveAmount: 0.72,
-    driveEnabled: true,
+    driveEnabled: false, // 👈 CAMBIO
+
 
     // ❌ DELAY OFF
     delayEnabled: false,
@@ -333,10 +334,10 @@ const PRESETS: Record<
     feedbackAmount: 0.0,
     mixAmount: 0.0,
 
-    // REVERB bajita para no embarrar
+    // REVERB
     reverbAmount: 0.18,
 
-    // ❌ SITAR OFF (muy importante)
+    // ❌ SITAR OFF
     sitarAmount: 0.0,
     sitarMode: 'sharp',
 
@@ -354,28 +355,31 @@ const PRESETS: Record<
     flangerMix: 0.0,
     flangerFeedback: 0.0,
 
-    // ❌ OCTAVE OFF
+    // OCTAVE (dejé tal cual lo tenías)
     octaveEnabled: true,
     octaveTone: 0.5,
     octaveLevel: 1.0,
     octaveMix: 0.3,
 
-    // Valve apagado (si lo prendés, que sea con cuidado)
+    // Valve (dejé tal cual lo tenías)
     valveEnabled: true,
-    valveDrive: 0.15,
-    valveTone: 0.15,
+    valveDrive: 0.95,
+    valveTone: 0.85,
     valveLevel: 1.05,
     valveMode: 'distortion',
 
-    // ❌ RAGA OFF (todo 0)
+    // ❌ RAGA OFF
     ragaEnabled: false,
     ragaResonance: 0.0,
     ragaDroneLevel: 0.0,
     ragaColor: 0.0,
-
     isPunchArmed: false,
-    armPunchIn: function (): void { throw new Error('Function not implemented.'); },
-    setIsPunchArmed: function (): void { throw new Error('Function not implemented.'); },
+    armPunchIn: function (): void {
+      throw new Error('Function not implemented.');
+    },
+    setIsPunchArmed: function (): void {
+      throw new Error('Function not implemented.');
+    }
   },
 },
 };
