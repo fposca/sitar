@@ -364,8 +364,8 @@ const PRESETS: Record<
     // Valve (dejé tal cual lo tenías)
     valveEnabled: true,
     valveDrive: 0.95,
-    valveTone: 0.85,
-    valveLevel: 1.05,
+    valveTone: 0.65,
+    valveLevel: 0.65,
     valveMode: 'distortion',
 
     // ❌ RAGA OFF

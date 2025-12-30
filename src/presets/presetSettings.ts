@@ -35,13 +35,19 @@ export function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
 function sanitizeSitarMode(raw: unknown): SitarMode | null {
   if (!isString(raw)) return null;
+  // Ajustado a tu engine actual
   if (raw === "sharp" || raw === "major" || raw === "minor" || raw === "exotic") return raw;
   return null;
 }
 
-function sanitizeValveMode(raw: unknown): DriveMode {
+// DriveMode (lo usás tanto para valveMode como para driveMode)
+function sanitizeDriveMode(raw: unknown): DriveMode {
   if (!isString(raw)) return "overdrive";
   if (raw === "overdrive" || raw === "crunch" || raw === "distortion") return raw;
   return "overdrive";
@@ -59,7 +65,7 @@ function sanitizeUiSubPanel(raw: unknown): UiSubPanel | undefined {
   return undefined;
 }
 
-// ✅ defaults (para presets viejos o payload incompleto)
+// ✅ defaults (seguros + válidos para WebAudio)
 const DEFAULTS: EngineSettingsV1 = {
   // Amp
   ampGain: 1.0,
@@ -75,6 +81,7 @@ const DEFAULTS: EngineSettingsV1 = {
   // Drive
   driveEnabled: false,
   driveAmount: 0.3,
+  driveMode: "overdrive",
 
   // Delay
   delayEnabled: false,
@@ -87,7 +94,7 @@ const DEFAULTS: EngineSettingsV1 = {
 
   // Sitar
   sitarAmount: 0.3,
-  sitarMode: "major",
+  sitarMode: "exotic",
 
   // Phaser
   phaserEnabled: false,
@@ -101,6 +108,7 @@ const DEFAULTS: EngineSettingsV1 = {
   flangerEnabled: false,
   flangerRate: 0.2,
   flangerDepth: 0.6,
+  flangerFeedback: 0.0,
   flangerMix: 0.4,
 
   // Octave
@@ -109,7 +117,7 @@ const DEFAULTS: EngineSettingsV1 = {
   octaveLevel: 1.0,
   octaveMix: 0.5,
 
-  // Valve / Disto+
+  // Valve
   valveEnabled: false,
   valveDrive: 0.45,
   valveTone: 0.5,
@@ -121,87 +129,60 @@ const DEFAULTS: EngineSettingsV1 = {
   ragaResonance: 0.5,
   ragaDroneLevel: 0.4,
   ragaColor: 0.5,
+
+  // ✅ Compressor (valores válidos)
   compressorEnabled: false,
-  compressorThreshold: 0,
-  compressorRatio: 0,
-  compressorAttack: 0,
-  compressorRelease: 0,
-  compressorKnee: 0,
-  compressorMakeup: 0,
-  compressorMix: 0,
-  flangerFeedback: 0,
-  isPunchArmed: false,
-  armPunchIn: function (cursorSec: number): void {
-    throw new Error("Function not implemented.");
-  },
-  setIsPunchArmed: function (v: boolean): void {
-    throw new Error("Function not implemented.");
-  }
+  compressorThreshold: -24, // dB, típico
+  compressorRatio: 4,       // [1..20]
+  compressorAttack: 0.01,   // segundos (>0)
+  compressorRelease: 0.12,  // segundos
+  compressorKnee: 20,       // dB
+  compressorMakeup: 1.0,    // gain
+  compressorMix: 1.0,       // 0..1
 };
 
 function sanitizeSettingsV1(raw: any): EngineSettingsV1 | null {
   if (!raw || typeof raw !== "object") return null;
 
-  // mínimos obligatorios (core)
-  const required: Array<[keyof EngineSettingsV1, (v: any) => boolean]> = [
-    ["ampGain", isNumber],
-    ["ampTone", isNumber],
-    ["ampMaster", isNumber],
+  // 🔥 En vez de "required" estricto, hacemos tolerante:
+  // - si falta algo, cae a DEFAULTS
+  // - si algo existe pero es inválido, se ignora y queda default
 
-    ["bassAmount", isNumber],
-    ["midAmount", isNumber],
-    ["trebleAmount", isNumber],
-    ["presenceAmount", isNumber],
+  const s: EngineSettingsV1 = { ...DEFAULTS };
 
-    ["driveEnabled", isBool],
-    ["driveAmount", isNumber],
+  // Core amp
+  if (isNumber(raw.ampGain)) s.ampGain = raw.ampGain;
+  if (isNumber(raw.ampTone)) s.ampTone = clamp01(raw.ampTone);
+  if (isNumber(raw.ampMaster)) s.ampMaster = raw.ampMaster;
 
-    ["delayEnabled", isBool],
-    ["delayTimeMs", isNumber],
-    ["feedbackAmount", isNumber],
-    ["mixAmount", isNumber],
+  // Tonestack
+  if (isNumber(raw.bassAmount)) s.bassAmount = clamp01(raw.bassAmount);
+  if (isNumber(raw.midAmount)) s.midAmount = clamp01(raw.midAmount);
+  if (isNumber(raw.trebleAmount)) s.trebleAmount = clamp01(raw.trebleAmount);
+  if (isNumber(raw.presenceAmount)) s.presenceAmount = clamp01(raw.presenceAmount);
 
-    ["reverbAmount", isNumber],
+  // Drive
+  if (isBool(raw.driveEnabled)) s.driveEnabled = raw.driveEnabled;
+  if (isNumber(raw.driveAmount)) s.driveAmount = clamp01(raw.driveAmount);
+  if (raw.driveMode != null) s.driveMode = sanitizeDriveMode(raw.driveMode);
 
-    ["sitarAmount", isNumber],
-    ["sitarMode", isString],
-  ];
+  // Delay
+  if (isBool(raw.delayEnabled)) s.delayEnabled = raw.delayEnabled;
+  if (isNumber(raw.delayTimeMs)) s.delayTimeMs = Math.max(0, raw.delayTimeMs);
+  if (isNumber(raw.feedbackAmount)) s.feedbackAmount = clamp01(raw.feedbackAmount);
+  if (isNumber(raw.mixAmount)) s.mixAmount = clamp01(raw.mixAmount);
 
-  for (const [k, test] of required) {
-    if (!test(raw[k])) return null;
+  // Reverb
+  if (isNumber(raw.reverbAmount)) s.reverbAmount = clamp01(raw.reverbAmount);
+
+  // Sitar
+  if (isNumber(raw.sitarAmount)) s.sitarAmount = clamp01(raw.sitarAmount);
+  if (raw.sitarMode != null) {
+    const m = sanitizeSitarMode(raw.sitarMode);
+    if (m) s.sitarMode = m;
   }
 
-  const sitarMode = sanitizeSitarMode(raw.sitarMode);
-  if (!sitarMode) return null;
-
-  // base defaults + core normalizado
-  const s: EngineSettingsV1 = {
-    ...DEFAULTS,
-
-    ampGain: raw.ampGain,
-    ampTone: clamp01(raw.ampTone),
-    ampMaster: raw.ampMaster,
-
-    bassAmount: clamp01(raw.bassAmount),
-    midAmount: clamp01(raw.midAmount),
-    trebleAmount: clamp01(raw.trebleAmount),
-    presenceAmount: clamp01(raw.presenceAmount),
-
-    driveEnabled: raw.driveEnabled,
-    driveAmount: clamp01(raw.driveAmount),
-
-    delayEnabled: raw.delayEnabled,
-    delayTimeMs: Math.max(0, raw.delayTimeMs),
-    feedbackAmount: clamp01(raw.feedbackAmount),
-    mixAmount: clamp01(raw.mixAmount),
-
-    reverbAmount: clamp01(raw.reverbAmount),
-
-    sitarAmount: clamp01(raw.sitarAmount),
-    sitarMode,
-  };
-
-  // Extras: si vienen, pisan defaults
+  // Phaser
   if (isBool(raw.phaserEnabled)) s.phaserEnabled = raw.phaserEnabled;
   if (isNumber(raw.phaserRate)) s.phaserRate = clamp01(raw.phaserRate);
   if (isNumber(raw.phaserDepth)) s.phaserDepth = clamp01(raw.phaserDepth);
@@ -209,26 +190,41 @@ function sanitizeSettingsV1(raw: any): EngineSettingsV1 | null {
   if (isNumber(raw.phaserMix)) s.phaserMix = clamp01(raw.phaserMix);
   if (isNumber(raw.phaserCenter)) s.phaserCenter = clamp01(raw.phaserCenter);
 
+  // Flanger
   if (isBool(raw.flangerEnabled)) s.flangerEnabled = raw.flangerEnabled;
   if (isNumber(raw.flangerRate)) s.flangerRate = clamp01(raw.flangerRate);
   if (isNumber(raw.flangerDepth)) s.flangerDepth = clamp01(raw.flangerDepth);
+  if (isNumber(raw.flangerFeedback)) s.flangerFeedback = clamp01(raw.flangerFeedback);
   if (isNumber(raw.flangerMix)) s.flangerMix = clamp01(raw.flangerMix);
 
+  // Octave
   if (isBool(raw.octaveEnabled)) s.octaveEnabled = raw.octaveEnabled;
   if (isNumber(raw.octaveTone)) s.octaveTone = clamp01(raw.octaveTone);
   if (isNumber(raw.octaveLevel)) s.octaveLevel = clamp01(raw.octaveLevel);
   if (isNumber(raw.octaveMix)) s.octaveMix = clamp01(raw.octaveMix);
 
+  // Valve
   if (isBool(raw.valveEnabled)) s.valveEnabled = raw.valveEnabled;
   if (isNumber(raw.valveDrive)) s.valveDrive = clamp01(raw.valveDrive);
   if (isNumber(raw.valveTone)) s.valveTone = clamp01(raw.valveTone);
   if (isNumber(raw.valveLevel)) s.valveLevel = clamp01(raw.valveLevel);
-  if (raw.valveMode != null) s.valveMode = sanitizeValveMode(raw.valveMode);
+  if (raw.valveMode != null) s.valveMode = sanitizeDriveMode(raw.valveMode);
 
+  // Raga
   if (isBool(raw.ragaEnabled)) s.ragaEnabled = raw.ragaEnabled;
   if (isNumber(raw.ragaResonance)) s.ragaResonance = clamp01(raw.ragaResonance);
   if (isNumber(raw.ragaDroneLevel)) s.ragaDroneLevel = clamp01(raw.ragaDroneLevel);
   if (isNumber(raw.ragaColor)) s.ragaColor = clamp01(raw.ragaColor);
+
+  // ✅ Compressor (saneado a rangos válidos WebAudio)
+  if (isBool(raw.compressorEnabled)) s.compressorEnabled = raw.compressorEnabled;
+  if (isNumber(raw.compressorThreshold)) s.compressorThreshold = clamp(raw.compressorThreshold, -60, 0);
+  if (isNumber(raw.compressorRatio)) s.compressorRatio = clamp(raw.compressorRatio, 1, 20);
+  if (isNumber(raw.compressorAttack)) s.compressorAttack = clamp(raw.compressorAttack, 0.001, 0.2);
+  if (isNumber(raw.compressorRelease)) s.compressorRelease = clamp(raw.compressorRelease, 0.03, 1.0);
+  if (isNumber(raw.compressorKnee)) s.compressorKnee = clamp(raw.compressorKnee, 0, 40);
+  if (isNumber(raw.compressorMakeup)) s.compressorMakeup = clamp(raw.compressorMakeup, 0, 3);
+  if (isNumber(raw.compressorMix)) s.compressorMix = clamp01(raw.compressorMix);
 
   return s;
 }

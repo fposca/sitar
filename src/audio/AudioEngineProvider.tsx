@@ -7,8 +7,9 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import type { AudioEngineContextValue, DriveMode, EngineSettings, SitarMode } from './audioTypes';
+import type { AudioEngineContextValue, DriveMode, EngineSettings, PresetSettings, SitarMode } from './audioTypes';
 import { applySitarMode, makeDriveCurve, computeWaveform } from './audioDSP';
+import type { EngineSettingsV1 } from '../presets/presetSettings';
 type Take = {
   id: string;
   name: string;
@@ -185,6 +186,482 @@ export type { SitarMode } from './audioTypes';
 type Props = {
   children: React.ReactNode;
 };
+// Construye el graph OFFLINE (incluye pedales)
+function buildOfflineFullGraph(ctx: BaseAudioContext, s: PresetSettings) {
+  const input = new GainNode(ctx, { gain: 1 });
+
+  // === TONESTACK ===
+  const bass = new BiquadFilterNode(ctx, {
+    type: 'lowshelf',
+    frequency: 120,
+    gain: (s.bassAmount - 0.5) * 12,
+  });
+
+  const mid = new BiquadFilterNode(ctx, {
+    type: 'peaking',
+    frequency: 900,
+    Q: 1.0,
+    gain: (s.midAmount - 0.5) * 10,
+  });
+
+  const treble = new BiquadFilterNode(ctx, {
+    type: 'highshelf',
+    frequency: 3500,
+    gain: (s.trebleAmount - 0.5) * 12,
+  });
+
+  input.connect(bass);
+  bass.connect(mid);
+  mid.connect(treble);
+
+  // === AMP INPUT ===
+  const ampGain = new GainNode(ctx, { gain: s.ampGain });
+  treble.connect(ampGain);
+
+  // === PRE-DRIVE band-limit ===
+  const preDriveHP = new BiquadFilterNode(ctx, { type: 'highpass', frequency: 85, Q: 0.707 });
+  const preDriveLP = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 4500, Q: 0.707 });
+  ampGain.connect(preDriveHP);
+  preDriveHP.connect(preDriveLP);
+
+  // === DRIVE true bypass (offline) ===
+  const driveDry = new GainNode(ctx, { gain: s.driveEnabled ? 0 : 1 });
+  const driveWet = new GainNode(ctx, { gain: s.driveEnabled ? 1 : 0 });
+
+  const drivePad = new GainNode(ctx, { gain: 0.6 });
+  const antiRfPreDrive = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 9500, Q: 0.7 });
+
+  const shaper = new WaveShaperNode(ctx, { oversample: '4x' });
+  shaper.curve = makeDriveCurve(s.driveMode ?? 'overdrive', s.driveEnabled ? s.driveAmount : 0);
+
+  preDriveLP.connect(driveDry);
+
+  preDriveLP.connect(drivePad);
+  drivePad.connect(antiRfPreDrive);
+  antiRfPreDrive.connect(shaper);
+  shaper.connect(driveWet);
+
+  const driveSum = new GainNode(ctx, { gain: 1 });
+  driveDry.connect(driveSum);
+  driveWet.connect(driveSum);
+
+  const postDriveLP = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 5500, Q: 0.707 });
+  driveSum.connect(postDriveLP);
+
+  // === AMP TONE (lowpass) ===
+  const tone = new BiquadFilterNode(ctx, { type: 'lowpass' });
+  const minTone = 200;
+  const maxTone = 16000;
+  tone.frequency.value = minTone + s.ampTone * (maxTone - minTone);
+  postDriveLP.connect(tone);
+
+  // === COMP (true bypass + parallel mix) ===
+  const comp = new DynamicsCompressorNode(ctx, {
+    threshold: s.compressorThreshold,
+    ratio: s.compressorRatio,
+    attack: s.compressorAttack,
+    release: s.compressorRelease,
+    knee: s.compressorKnee,
+  });
+
+  const makeup = new GainNode(ctx, { gain: s.compressorMakeup });
+
+  const compDry = new GainNode(ctx, { gain: s.compressorEnabled ? (1 - s.compressorMix) : 1 });
+  const compWet = new GainNode(ctx, { gain: s.compressorEnabled ? s.compressorMix : 0 });
+
+  tone.connect(compDry);
+  tone.connect(comp);
+  comp.connect(makeup);
+  makeup.connect(compWet);
+
+  const compSum = new GainNode(ctx, { gain: 1 });
+  compDry.connect(compSum);
+  compWet.connect(compSum);
+
+  // ====== PEDALES EN SERIE (valve -> octave -> phaser -> flanger) ======
+
+  let chain: AudioNode = compSum;
+
+  // --- VALVE (true bypass) ---
+  {
+    const dry = new GainNode(ctx, { gain: s.valveEnabled ? 0 : 1 });
+    const wet = new GainNode(ctx, { gain: s.valveEnabled ? 1 : 0 });
+
+    const antiRf = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 9500, Q: 0.7 });
+    const vShaper = new WaveShaperNode(ctx, { oversample: '4x' });
+    vShaper.curve = makeDriveCurve(s.valveMode ?? 'crunch', s.valveEnabled ? s.valveDrive : 0);
+
+    const vTone = new BiquadFilterNode(ctx, { type: 'lowpass' });
+    vTone.frequency.value = 800 + s.valveTone * (16000 - 800);
+
+    const vLevel = new GainNode(ctx, { gain: s.valveLevel });
+
+    chain.connect(dry);
+    chain.connect(antiRf);
+    antiRf.connect(vShaper);
+    vShaper.connect(vTone);
+    vTone.connect(vLevel);
+    vLevel.connect(wet);
+
+    const sum = new GainNode(ctx, { gain: 1 });
+    dry.connect(sum);
+    wet.connect(sum);
+    chain = sum;
+  }
+
+  // --- OCTAVE (tu ring-mod simplificado) ---
+  {
+    const dry = new GainNode(ctx, { gain: s.octaveEnabled ? (1 - s.octaveMix) : 1 });
+    const wet = new GainNode(ctx, {
+      gain: s.octaveEnabled ? (s.octaveMix * (0.5 + s.octaveLevel * 1.5)) : 0,
+    });
+
+    const ring = new GainNode(ctx, { gain: 1 });
+
+    const osc = new OscillatorNode(ctx, { type: 'sine', frequency: 440 });
+    const modDepth = new GainNode(ctx, { gain: s.octaveEnabled ? (s.octaveMix * 2.0) : 0 });
+    osc.connect(modDepth);
+    modDepth.connect(ring.gain);
+    osc.start();
+
+    const toneF = new BiquadFilterNode(ctx, { type: 'lowpass' });
+    toneF.frequency.value = 800 + s.octaveTone * (16000 - 800);
+
+    chain.connect(dry);
+    chain.connect(ring);
+    ring.connect(toneF);
+    toneF.connect(wet);
+
+    const sum = new GainNode(ctx, { gain: 1 });
+    dry.connect(sum);
+    wet.connect(sum);
+    chain = sum;
+  }
+
+  // --- PHASER (mix simple) ---
+  {
+    const phIn = new GainNode(ctx, { gain: 1 });
+    chain.connect(phIn);
+
+    const dry = new GainNode(ctx, { gain: s.phaserEnabled ? (1 - s.phaserMix) : 1 });
+    const wet = new GainNode(ctx, { gain: s.phaserEnabled ? s.phaserMix : 0 });
+    phIn.connect(dry);
+
+    const stages = 6;
+    const aps: BiquadFilterNode[] = [];
+    for (let i = 0; i < stages; i++) {
+      aps.push(new BiquadFilterNode(ctx, { type: 'allpass', frequency: 900, Q: 0.7 }));
+    }
+    phIn.connect(aps[0]);
+    for (let i = 0; i < stages - 1; i++) aps[i].connect(aps[i + 1]);
+
+    const fb = new GainNode(ctx, { gain: s.phaserEnabled ? (s.phaserFeedback * 0.85) : 0 });
+    aps[stages - 1].connect(fb);
+    fb.connect(phIn);
+
+    aps[stages - 1].connect(wet);
+
+    // LFO
+    const minHz = 0.05;
+    const maxHz = 2.5;
+    const hz = minHz + s.phaserRate * (maxHz - minHz);
+
+    const minF = 250;
+    const maxF = 1800;
+    const base = minF + s.phaserCenter * (maxF - minF);
+
+    const sweep = 50 + s.phaserDepth * 1400;
+
+    const lfo = new OscillatorNode(ctx, { type: 'sine', frequency: hz });
+    const lfoGain = new GainNode(ctx, { gain: s.phaserEnabled ? sweep : 0 });
+    lfo.connect(lfoGain);
+    aps.forEach((ap) => {
+      ap.frequency.value = base;
+      lfoGain.connect(ap.frequency);
+    });
+    lfo.start();
+
+    const sum = new GainNode(ctx, { gain: 1 });
+    dry.connect(sum);
+    wet.connect(sum);
+    chain = sum;
+  }
+
+  // --- FLANGER ---
+  {
+    const flIn = new GainNode(ctx, { gain: 1 });
+    chain.connect(flIn);
+
+    const dry = new GainNode(ctx, { gain: s.flangerEnabled ? (1 - s.flangerMix) : 1 });
+    const wet = new GainNode(ctx, { gain: s.flangerEnabled ? s.flangerMix : 0 });
+    flIn.connect(dry);
+
+    const d = new DelayNode(ctx, { delayTime: 0.0025, maxDelayTime: 0.02 });
+    const fb = new GainNode(ctx, { gain: s.flangerEnabled ? (s.flangerFeedback * 0.85) : 0 });
+
+    flIn.connect(d);
+    d.connect(fb);
+    fb.connect(d);
+    d.connect(wet);
+
+    const minHz = 0.05;
+    const maxHz = 1.2;
+    const hz = minHz + s.flangerRate * (maxHz - minHz);
+    const depthMs = 4.0 * s.flangerDepth;
+
+    const lfo = new OscillatorNode(ctx, { type: 'sine', frequency: hz });
+    const lfoGain = new GainNode(ctx, { gain: s.flangerEnabled ? (depthMs / 1000) : 0 });
+    lfo.connect(lfoGain);
+    lfoGain.connect(d.delayTime);
+    lfo.start();
+
+    const sum = new GainNode(ctx, { gain: 1 });
+    dry.connect(sum);
+    wet.connect(sum);
+    chain = sum;
+  }
+
+  // ====== RAGA (paralelo al bus, lo sumamos antes del delay) ======
+  // Bus donde se suma TODO antes del delay (incluye sitar/raga)
+  const preDelayBus = new GainNode(ctx, { gain: 1 });
+
+  // --- SITAR (dry/wet) ---
+  {
+    const sitarDry = new GainNode(ctx, { gain: 1 - s.sitarAmount });
+    const sitarWet = new GainNode(ctx, { gain: s.sitarAmount });
+
+    const band = new BiquadFilterNode(ctx, { type: 'bandpass' });
+    const symp = new BiquadFilterNode(ctx, { type: 'bandpass' });
+
+    const jawari = new WaveShaperNode(ctx, { oversample: '4x' });
+    jawari.curve = makeDriveCurve('distortion', 0.55);
+
+    const jDelay = new DelayNode(ctx, { delayTime: 0.0015, maxDelayTime: 0.02 });
+    const jFb = new GainNode(ctx, { gain: 0.65 });
+    const jHP = new BiquadFilterNode(ctx, { type: 'highpass', frequency: 1800 });
+
+    applySitarMode(s.sitarMode, {
+      sitarBandpass: band,
+      sitarSympathetic: symp,
+      jawariDrive: jawari,
+      jawariHighpass: jHP,
+    });
+
+    // entrada a la sección sitar es "chain"
+    chain.connect(sitarDry);
+    chain.connect(band);
+    chain.connect(symp);
+
+    band.connect(jawari);
+    jawari.connect(jDelay);
+    jDelay.connect(jFb);
+    jFb.connect(jDelay);
+    jDelay.connect(jHP);
+    jHP.connect(sitarWet);
+
+    symp.connect(sitarWet);
+
+    // suma en preDelay
+    sitarDry.connect(preDelayBus);
+    sitarWet.connect(preDelayBus);
+  }
+
+  // --- RAGA resonador en paralelo ---
+  {
+    const res1 = new BiquadFilterNode(ctx, { type: 'peaking', frequency: 2200, Q: 10, gain: 0 });
+    const res2 = new BiquadFilterNode(ctx, { type: 'peaking', frequency: 6200, Q: 16, gain: 0 });
+
+    const rDrive = new WaveShaperNode(ctx, { oversample: '4x' });
+    rDrive.curve = makeDriveCurve('crunch', 0.25);
+
+    const mix = new GainNode(ctx, { gain: s.ragaEnabled ? (0.15 + s.ragaDroneLevel * 1.35) : 0 });
+
+    // parámetros en base a knobs
+    const base1 = 900 + s.ragaColor * 3200;
+    const base2 = 2800 + s.ragaColor * 2200;
+    res1.frequency.value = base1;
+    res2.frequency.value = base2;
+
+    const q1 = 3 + s.ragaResonance * 22;
+    const q2 = 3 + s.ragaResonance * 6;
+    res1.Q.value = q1;
+    res2.Q.value = q2;
+
+    const g1 = 2 + s.ragaResonance * 16;
+    const g2 = 1 + s.ragaResonance * 6;
+    res1.gain.value = g1;
+    res2.gain.value = g2;
+
+    const preHP = new BiquadFilterNode(ctx, { type: 'highpass', frequency: 120, Q: 0.707 });
+    const preLP = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 3600, Q: 0.707 });
+    const preDriveLP = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 5200, Q: 0.707 });
+    const antiRF = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 6000, Q: 0.7 });
+
+    chain.connect(preHP);
+    preHP.connect(preLP);
+    preLP.connect(res1);
+    res1.connect(res2);
+    res2.connect(preDriveLP);
+    preDriveLP.connect(rDrive);
+    rDrive.connect(mix);
+    mix.connect(antiRF);
+
+    antiRF.connect(preDelayBus);
+  }
+
+  // ====== DELAY ======
+  const dry = new GainNode(ctx, { gain: 1 - s.mixAmount });
+  const wet = new GainNode(ctx, { gain: s.delayEnabled ? s.mixAmount : 0 });
+
+  const delay = new DelayNode(ctx, { delayTime: s.delayTimeMs / 1000, maxDelayTime: 2.0 });
+  const fb = new GainNode(ctx, { gain: s.feedbackAmount });
+
+  preDelayBus.connect(dry);
+  preDelayBus.connect(delay);
+  delay.connect(wet);
+  delay.connect(fb);
+  fb.connect(delay);
+
+  // ====== AMP MASTER + PRESENCE ======
+  const master = new GainNode(ctx, { gain: s.ampMaster * 2.0 });
+
+  dry.connect(master);
+  wet.connect(master);
+
+  const presence = new BiquadFilterNode(ctx, {
+    type: 'highshelf',
+    frequency: 5500,
+    gain: (s.presenceAmount - 0.5) * 14,
+  });
+
+  master.connect(presence);
+
+  // ====== REVERB ======
+  const reverbDry = new GainNode(ctx, { gain: 1 - s.reverbAmount });
+  const reverbWet = new GainNode(ctx, { gain: s.reverbAmount });
+
+  const convolver = new ConvolverNode(ctx);
+  // OJO: acá NO tenemos getReverbImpulse (AudioContext) porque ctx puede ser Offline.
+  // Creamos impulse simple inline (igual al tuyo).
+  {
+    const duration = 1.8;
+    const rate = ctx.sampleRate;
+    const length = Math.floor(duration * rate);
+    const impulse = ctx.createBuffer(2, length, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = impulse.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        const t = i / length;
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.5);
+      }
+    }
+    convolver.buffer = impulse;
+  }
+
+  presence.connect(reverbDry);
+  presence.connect(convolver);
+  convolver.connect(reverbWet);
+
+  const output = new GainNode(ctx, { gain: 1 });
+  reverbDry.connect(output);
+  reverbWet.connect(output);
+
+  return { input, output };
+}
+
+function rms(buffer: AudioBuffer) {
+  const ch0 = buffer.getChannelData(0);
+  let sum = 0;
+  for (let i = 0; i < ch0.length; i++) sum += ch0[i] * ch0[i];
+  return Math.sqrt(sum / ch0.length);
+}
+
+// Construye el graph con el ctx que le pases (AudioContext u OfflineAudioContext)
+function buildBasicGraph(ctx: BaseAudioContext, settings: EngineSettings) {
+  const input = new GainNode(ctx, { gain: 1 });
+
+  // PRE
+  const pre = new GainNode(ctx, { gain: 1 });
+  input.connect(pre);
+
+  // DRIVE paralelo
+  const shaper = new WaveShaperNode(ctx, { oversample: '4x' });
+
+  // 🔥 FIX: makeDriveCurve(mode, amount)
+  // Si vos tenés driveMode en settings, usalo. Si no, default “distortion”.
+  const mode = (settings as any).driveMode ?? 'distortion';
+  shaper.curve = makeDriveCurve(mode, settings.driveAmount);
+
+  const driveMix = new GainNode(ctx, { gain: settings.driveEnabled ? 1 : 0 });
+  const dryMix = new GainNode(ctx, { gain: settings.driveEnabled ? 0 : 1 });
+
+  // pre.connect(dryMix);
+  // dryMix.connect(ctx.destination); // OJO: esto NO, lo conectamos luego (ver abajo)
+  // ⛔️ IMPORTANTE: NO conectes a destination acá. Abajo te muestro cómo.
+
+  // En vez de conectarlo a destination, armamos un “sum node”
+  const sum = new GainNode(ctx, { gain: 1 });
+
+  // dry
+  pre.connect(dryMix);
+  dryMix.connect(sum);
+
+  // wet
+  pre.connect(shaper);
+  shaper.connect(driveMix);
+  driveMix.connect(sum);
+
+  // COMP
+  const comp = new DynamicsCompressorNode(ctx, {
+    threshold: settings.compressorThreshold,
+    ratio: settings.compressorRatio,
+    attack: settings.compressorAttack,
+    release: settings.compressorRelease,
+    knee: settings.compressorKnee,
+  });
+
+  const makeup = new GainNode(ctx, { gain: settings.compressorMakeup });
+
+  sum.connect(comp);
+  comp.connect(makeup);
+
+  // EQ (simple)
+  const bass = new BiquadFilterNode(ctx, {
+    type: 'lowshelf',
+    frequency: 120,
+    gain: (settings.bassAmount - 0.5) * 24,
+  });
+  const mid = new BiquadFilterNode(ctx, {
+    type: 'peaking',
+    frequency: 750,
+    Q: 1,
+    gain: (settings.midAmount - 0.5) * 18,
+  });
+  const treble = new BiquadFilterNode(ctx, {
+    type: 'highshelf',
+    frequency: 3500,
+    gain: (settings.trebleAmount - 0.5) * 24,
+  });
+  const presence = new BiquadFilterNode(ctx, {
+    type: 'peaking',
+    frequency: 4200,
+    Q: 0.7,
+    gain: (settings.presenceAmount - 0.5) * 18,
+  });
+
+  makeup.connect(bass);
+  bass.connect(mid);
+  mid.connect(treble);
+  treble.connect(presence);
+
+  const ampGain = new GainNode(ctx, { gain: settings.ampGain });
+  const master = new GainNode(ctx, { gain: settings.ampMaster });
+
+  presence.connect(ampGain);
+  ampGain.connect(master);
+
+  return { input, output: master };
+}
 
 export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
@@ -201,6 +678,7 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [compressorKnee, setCompressorKnee] = useState(20);
   const [compressorMakeup, setCompressorMakeup] = useState(1.0);
   const [compressorMix, setCompressorMix] = useState(1.0); // 1 = full comp, 0 = dry
+  // const [processedBuffer, setProcessedBffer] = useState<AudioBuffer | null>(null);
 
 
   // ✅ Phaser
@@ -287,180 +765,181 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [offlinePreviewProgress, setOfflinePreviewProgress] = useState(0);
 
   // ✅ Helpers para presets (base / custom)
-  const getCurrentSettings = useCallback((): EngineSettings => {
-    return {
-      compressorEnabled,
+  const getCurrentSettings = useCallback((): PresetSettings => ({
+  ampGain,
+  ampTone,
+  ampMaster,
 
+  bassAmount,
+  midAmount,
+  trebleAmount,
+  presenceAmount,
 
-      compressorThreshold,
-      compressorRatio,
-      compressorAttack,
-      compressorRelease,
-      compressorKnee,
-      compressorMakeup,
-      compressorMix,
-      ampGain,
-      ampTone,
-      ampMaster,
-      bassAmount,
-      midAmount,
-      trebleAmount,
-      presenceAmount,
-      driveAmount,
-      driveEnabled,
-      delayEnabled,
-      delayTimeMs,
-      feedbackAmount,
-      mixAmount,
-      reverbAmount,
-      sitarAmount,
-      sitarMode,
-      phaserEnabled,
-      phaserRate,
-      phaserDepth,
-      phaserFeedback,
-      phaserMix,
-      phaserCenter,
+  driveAmount,
+  driveEnabled,
+  driveMode, // si existe en tu state
 
-      flangerEnabled,
-      flangerRate,
-      flangerDepth,
-      flangerFeedback,
-      flangerMix,
+  delayEnabled,
+  delayTimeMs,
+  feedbackAmount,
+  mixAmount,
 
-      octaveEnabled,
-      octaveTone,
-      octaveLevel,
-      octaveMix,
+  reverbAmount,
 
-      valveEnabled,
-      valveDrive,
-      valveTone,
-      valveLevel,
-      valveMode,
+  sitarAmount,
+  sitarMode,
 
-      ragaEnabled,
-      ragaResonance,
-      ragaDroneLevel,
-      ragaColor,
-      isPunchArmed,
-      armPunchIn,
-      setIsPunchArmed,
-    };
-  }, [
-    ampGain,
-    ampTone,
-    ampMaster,
-    bassAmount,
-    midAmount,
-    trebleAmount,
-    presenceAmount,
-    driveAmount,
-    driveEnabled,
-    delayEnabled,
-    delayTimeMs,
-    feedbackAmount,
-    mixAmount,
-    reverbAmount,
-    sitarAmount,
-    sitarMode,
-    phaserEnabled,
-    phaserRate,
-    phaserDepth,
-    phaserFeedback,
-    phaserMix,
-    phaserCenter,
+  compressorEnabled,
+  compressorThreshold,
+  compressorRatio,
+  compressorAttack,
+  compressorRelease,
+  compressorKnee,
+  compressorMakeup,
+  compressorMix,
 
-    flangerEnabled,
-    flangerRate,
-    flangerDepth,
-    flangerMix,
+  phaserEnabled,
+  phaserRate,
+  phaserDepth,
+  phaserFeedback,
+  phaserMix,
+  phaserCenter,
 
-    octaveEnabled,
+  flangerEnabled,
+  flangerRate,
+  flangerDepth,
+  flangerFeedback,
+  flangerMix,
 
-    octaveMix,
+  octaveEnabled,
+  octaveTone,
+  octaveLevel,
+  octaveMix,
 
-    valveEnabled,
-    valveDrive,
-    valveTone,
-    valveLevel,
-    valveMode,
+  valveEnabled,
+  valveDrive,
+  valveTone,
+  valveLevel,
+  valveMode,
 
-    ragaEnabled,
-    ragaResonance,
-    ragaDroneLevel,
-    ragaColor,
+  ragaEnabled,
+  ragaResonance,
+  ragaDroneLevel,
+  ragaColor,
+}), [
+   compressorEnabled,
+  compressorThreshold,
+  compressorRatio,
+  compressorAttack,
+  compressorRelease,
+  compressorKnee,
+  compressorMakeup,
+  compressorMix,
+  ampGain,
+  ampTone,
+  ampMaster,
+  bassAmount,
+  midAmount,
+  trebleAmount,
+  presenceAmount,
+  driveAmount,
+  driveEnabled,
+  delayEnabled,
+  delayTimeMs,
+  feedbackAmount,
+  mixAmount,
+  reverbAmount,
+  sitarAmount,
+  sitarMode,
+  phaserEnabled,
+  phaserRate,
+  phaserDepth,
+  phaserFeedback,
+  phaserMix,
+  phaserCenter,
+  flangerEnabled,
+  flangerRate,
+  flangerDepth,
+  flangerFeedback,
+  flangerMix,
+  octaveEnabled,
+  octaveTone,
+  octaveLevel,
+  octaveMix,
+  valveEnabled,
+  valveDrive,
+  valveTone,
+  valveLevel,
+  valveMode,
+  ragaEnabled,
+  ragaResonance,
+  ragaDroneLevel,
+  ragaColor,
 
   ]);
 
-  const applySettings = useCallback((s: EngineSettings) => {
-    // 🔹 UI state (React)
-    setCompressorEnabled(s.compressorEnabled);
-    setCompressorThreshold(s.compressorThreshold);
-    setCompressorRatio(s.compressorRatio);
-    setCompressorAttack(s.compressorAttack);
-    setCompressorRelease(s.compressorRelease);
-    setCompressorKnee(s.compressorKnee);
-    setCompressorMakeup(s.compressorMakeup);
-    setCompressorMix(s.compressorMix);
+  const applySettings = (s: PresetSettings) => {
+  setAmpGain(s.ampGain);
+  setAmpTone(s.ampTone);
+  setAmpMaster(s.ampMaster);
 
+  setBassAmount(s.bassAmount);
+  setMidAmount(s.midAmount);
+  setTrebleAmount(s.trebleAmount);
+  setPresenceAmount(s.presenceAmount);
 
-    setAmpGain(s.ampGain);
-    setAmpTone(s.ampTone);
-    setAmpMaster(s.ampMaster);
+  setDriveAmount(s.driveAmount);
+  setDriveEnabled(s.driveEnabled);
+  setDriveMode(s.driveMode);
 
-    setBassAmount(s.bassAmount);
-    setMidAmount(s.midAmount);
-    setTrebleAmount(s.trebleAmount);
-    setPresenceAmount(s.presenceAmount);
+  setDelayEnabled(s.delayEnabled);
+  setDelayTimeMs(s.delayTimeMs);
+  setFeedbackAmount(s.feedbackAmount);
+  setMixAmount(s.mixAmount);
 
-    setDriveAmount(s.driveAmount);
-    setDriveEnabled(s.driveEnabled);
+  setReverbAmount(s.reverbAmount);
 
-    setDelayEnabled(s.delayEnabled);
-    setDelayTimeMs(s.delayTimeMs);
-    setFeedbackAmount(s.feedbackAmount);
-    setMixAmount(s.mixAmount);
+  setSitarAmount(s.sitarAmount);
+  setSitarMode(s.sitarMode);
 
-    setReverbAmount(s.reverbAmount);
+  setCompressorEnabled(s.compressorEnabled);
+  setCompressorThreshold(s.compressorThreshold);
+  setCompressorRatio(s.compressorRatio);
+  setCompressorAttack(s.compressorAttack);
+  setCompressorRelease(s.compressorRelease);
+  setCompressorKnee(s.compressorKnee);
+  setCompressorMakeup(s.compressorMakeup);
+  setCompressorMix(s.compressorMix);
 
-    setSitarAmount(s.sitarAmount);
-    setSitarMode(s.sitarMode);
+  setPhaserEnabled(s.phaserEnabled);
+  setPhaserRate(s.phaserRate);
+  setPhaserDepth(s.phaserDepth);
+  setPhaserFeedback(s.phaserFeedback);
+  setPhaserMix(s.phaserMix);
+  setPhaserCenter(s.phaserCenter);
 
-    // ✅ Phaser
-    setPhaserEnabled(s.phaserEnabled);
-    setPhaserRate(s.phaserRate);
-    setPhaserDepth(s.phaserDepth);
-    setPhaserFeedback(s.phaserFeedback);
-    setPhaserMix(s.phaserMix);
-    setPhaserCenter(s.phaserCenter);
+  setFlangerEnabled(s.flangerEnabled);
+  setFlangerRate(s.flangerRate);
+  setFlangerDepth(s.flangerDepth);
+  setFlangerFeedback(s.flangerFeedback);
+  setFlangerMix(s.flangerMix);
 
-    // ✅ Flanger
-    setFlangerEnabled(s.flangerEnabled);
-    setFlangerRate(s.flangerRate);
-    setFlangerDepth(s.flangerDepth);
-    setFlangerFeedback(s.flangerFeedback); // ✅ AGREGAR
-    setFlangerMix(s.flangerMix);
+  setOctaveEnabled(s.octaveEnabled);
+  setOctaveTone(s.octaveTone);
+  setOctaveLevel(s.octaveLevel);
+  setOctaveMix(s.octaveMix);
 
-    // ✅ Octave
-    setOctaveEnabled(s.octaveEnabled);
-    setOctaveTone(s.octaveTone);
-    setOctaveLevel(s.octaveLevel);
-    setOctaveMix(s.octaveMix);
+  setValveEnabled(s.valveEnabled);
+  setValveDrive(s.valveDrive);
+  setValveTone(s.valveTone);
+  setValveLevel(s.valveLevel);
+  setValveMode(s.valveMode);
 
-    // ✅ Valve
-    setValveEnabled(s.valveEnabled);
-    setValveDrive(s.valveDrive);
-    setValveTone(s.valveTone);
-    setValveLevel(s.valveLevel);
-    setValveMode(s.valveMode);
-
-    // ✅ Raga
-    setRagaEnabled(s.ragaEnabled);
-    setRagaResonance(s.ragaResonance);
-    setRagaDroneLevel(s.ragaDroneLevel);
-    setRagaColor(s.ragaColor);
-  }, []);
+  setRagaEnabled(s.ragaEnabled);
+  setRagaResonance(s.ragaResonance);
+  setRagaDroneLevel(s.ragaDroneLevel);
+  setRagaColor(s.ragaColor);
+};
 
 
   // Refs para la animación del cursor en el preview offline
@@ -471,10 +950,10 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   const [takes, setTakes] = useState<Take[]>([]);
   const activeTakeIdRef = useRef<string | null>(null);
 
+
   const driveDryRef = useRef<GainNode | null>(null);
   const driveWetRef = useRef<GainNode | null>(null);
-  const postDriveLPRef = useRef<BiquadFilterNode | null>(null);
-  const postDriveHPRef = useRef<BiquadFilterNode | null>(null);
+
   const antiRfPreDriveRef = useRef<BiquadFilterNode | null>(null);
 
 
@@ -1624,290 +2103,50 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
   );
 
   // Procesar un archivo a través del Sitar Amp usando OfflineAudioContext
-  const processFileThroughSitar = useCallback(
-    async (file: File) => {
-      try {
-        const mainCtx = getOrCreateAudioContext();
-        const arrayBuffer = await file.arrayBuffer();
-        const decoded = await mainCtx.decodeAudioData(arrayBuffer);
-
-        const offlineCtx = new OfflineAudioContext(
-          decoded.numberOfChannels,
-          decoded.length,
-          decoded.sampleRate,
-        );
-
-        const src = offlineCtx.createBufferSource();
-        src.buffer = decoded;
-
-        // === Grafo simplificado tipo SitarAmp ===
-        const inputGain = offlineCtx.createGain();
-        inputGain.gain.value = 1;
-
-        // Drive
-        const driveNode = offlineCtx.createWaveShaper();
-        driveNode.curve = makeDriveCurve(driveMode, driveEnabled ? driveAmount : 0);
-        driveNode.oversample = '4x';
-
-        // Tone (lowpass sencillo)
-        const toneFilter = offlineCtx.createBiquadFilter();
-        toneFilter.type = 'lowpass';
-        const minFreq = 200;
-        const maxFreq = 16000;
-        toneFilter.frequency.value = minFreq + ampTone * (maxFreq - minFreq);
-
-        // Sitar
-        const sitarDryGain = offlineCtx.createGain();
-        sitarDryGain.gain.value = 1 - sitarAmount;
-
-        const sitarWetGain = offlineCtx.createGain();
-        sitarWetGain.gain.value = sitarAmount;
-
-        const sitarBandpass = offlineCtx.createBiquadFilter();
-        sitarBandpass.type = 'bandpass';
-
-        const sitarSympathetic = offlineCtx.createBiquadFilter();
-        sitarSympathetic.type = 'bandpass';
-
-        const jawariDrive = offlineCtx.createWaveShaper();
-        jawariDrive.curve = makeDriveCurve('distortion', 0.55);
-        jawariDrive.oversample = '4x';
-
-        const jawariDelay = offlineCtx.createDelay(0.02);
-        jawariDelay.delayTime.value = 0.0009;
-
-        const jawariFeedback = offlineCtx.createGain();
-        jawariFeedback.gain.value = 0.35;
-
-        const jawariHighpass = offlineCtx.createBiquadFilter();
-        jawariHighpass.type = 'highpass';
-        jawariHighpass.frequency.value = 1800;
-
-        applySitarMode(sitarMode, {
-          sitarBandpass,
-          sitarSympathetic,
-          jawariDrive,
-          jawariHighpass,
-        });
-
-        // Delay
-        const preDelayGain = offlineCtx.createGain();
-
-        const dryGain = offlineCtx.createGain();
-        dryGain.gain.value = 1 - mixAmount;
-
-        const wetGain = offlineCtx.createGain();
-        wetGain.gain.value = delayEnabled ? mixAmount : 0;
-
-        const delayNode = offlineCtx.createDelay(2.0);
-        delayNode.delayTime.value = delayTimeMs / 1000;
-
-        const feedbackGain = offlineCtx.createGain();
-        feedbackGain.gain.value = feedbackAmount;
-
-        // Master + reverb
-        const masterGainNode = offlineCtx.createGain();
-        masterGainNode.gain.value = ampMaster * 3.0 * masterVolume;
-
-        const reverbDry = offlineCtx.createGain();
-        const reverbWet = offlineCtx.createGain();
-        reverbDry.gain.value = 1 - reverbAmount;
-        reverbWet.gain.value = reverbAmount;
-
-        const reverb = offlineCtx.createConvolver();
-        // reutilizamos el generador de IR
-        reverb.buffer = getReverbImpulse(offlineCtx as unknown as AudioContext);
-
-        // === Conexiones ===
-        // ✅ band-limit antes del drive (offline también)
-        const preDriveHP = offlineCtx.createBiquadFilter();
-        preDriveHP.type = 'highpass';
-        preDriveHP.frequency.value = 70;
-        preDriveHP.Q.value = 0.707;
-
-        const preDriveLP = offlineCtx.createBiquadFilter();
-        preDriveLP.type = 'lowpass';
-        preDriveLP.frequency.value = 5200;
-        preDriveLP.Q.value = 0.707;
-
-        inputGain.connect(preDriveHP);
-        preDriveHP.connect(preDriveLP);
-        preDriveLP.connect(driveNode);
-
-        driveNode.connect(toneFilter);
-        // ======================================================
-        // 🔗 FX CHAIN OFFLINE (octave + phaser)
-        // ======================================================
-        let preFxOffline: AudioNode = toneFilter;
-
-        // -------- OCTAVE (OFFLINE) --------
-        const octaveDryOff = offlineCtx.createGain();
-        const octaveRingOff = offlineCtx.createGain();
-        const octaveOutOff = offlineCtx.createGain();
-
-        octaveDryOff.gain.value = 1.0;
-        octaveRingOff.gain.value = octaveEnabled ? octaveMix : 0;
-
-        preFxOffline.connect(octaveDryOff);
-        preFxOffline.connect(octaveRingOff);
-
-        octaveDryOff.connect(octaveOutOff);
-        octaveRingOff.connect(octaveOutOff);
-
-        preFxOffline = octaveOutOff;
-
-        // -------- PHASER (OFFLINE) --------
-        const phaserInOff = offlineCtx.createGain();
-
-        const phaserDryOff = offlineCtx.createGain();
-        const phaserWetOff = offlineCtx.createGain();
-        phaserDryOff.gain.value = 1 - (phaserEnabled ? phaserMix : 0);
-        phaserWetOff.gain.value = phaserEnabled ? phaserMix : 0;
-
-        const phaserFbOff = offlineCtx.createGain();
-        phaserFbOff.gain.value = phaserEnabled ? phaserFeedback * 0.85 : 0;
-
-        const stagesOff = 6;
-        const allpassesOff: BiquadFilterNode[] = [];
-
-        for (let i = 0; i < stagesOff; i++) {
-          const ap = offlineCtx.createBiquadFilter();
-          ap.type = 'allpass';
-          ap.Q.value = 0.7;
-          allpassesOff.push(ap);
-        }
-
-        phaserInOff.connect(allpassesOff[0]);
-        for (let i = 0; i < stagesOff - 1; i++) {
-          allpassesOff[i].connect(allpassesOff[i + 1]);
-        }
-
-        // feedback loop
-        allpassesOff[stagesOff - 1].connect(phaserFbOff);
-        phaserFbOff.connect(phaserInOff);
-
-        // wet/dry
-        allpassesOff[stagesOff - 1].connect(phaserWetOff);
-        phaserInOff.connect(phaserDryOff);
-
-        // out
-        const phaserOutOff = offlineCtx.createGain();
-        phaserDryOff.connect(phaserOutOff);
-        phaserWetOff.connect(phaserOutOff);
-
-        // LFO
-        const lfoOff = offlineCtx.createOscillator();
-        lfoOff.type = 'sine';
-        lfoOff.frequency.value = 0.05 + phaserRate * 2.5;
-
-        const lfoGainOff = offlineCtx.createGain();
-        lfoGainOff.gain.value = 50 + phaserDepth * 1400;
-
-        lfoOff.connect(lfoGainOff);
-
-        const baseFreqOff = 250 + phaserCenter * (1800 - 250);
-        allpassesOff.forEach((ap) => {
-          ap.frequency.value = baseFreqOff;
-          lfoGainOff.connect(ap.frequency);
-        });
-
-        lfoOff.start();
-
-        // routing: preFxOffline -> phaserInOff -> phaserOutOff
-        preFxOffline.connect(phaserInOff);
-        preFxOffline = phaserOutOff;
-
-
-        // ======================================================
-
-
-        // y a partir de acá seguís con octaveOut en vez de toneFilter:
-
-
-
-        // // Conexiones
-        // toneFilter.connect(octaveDry);
-        // toneFilter.connect(octaveRing);
-
-        // octaveOsc.connect(octaveRing.gain);
-
-        // // Mix
-        // const octaveOut = ctx.createGain();
-        // octaveDry.connect(octaveOut);
-        // octaveRing.connect(octaveOut);
-
-        // // Desde ahora, preSitarNode sale de octaveOut
-        // preSitarNode = octaveOut;
-
-
-        // sitar dry/wet entra desde la cadena OFFLINE
-        preFxOffline.connect(sitarDryGain);
-        preFxOffline.connect(sitarBandpass);
-        preFxOffline.connect(sitarSympathetic);
-        // sitar “jawari”
-
-        sitarBandpass.connect(jawariDrive);
-        jawariDrive.connect(jawariDelay);
-        jawariDelay.connect(jawariFeedback);
-        jawariFeedback.connect(jawariDelay);
-        jawariDelay.connect(jawariHighpass);
-        jawariHighpass.connect(sitarWetGain);
-
-        // sitar “sympathetic”
-
-        sitarSympathetic.connect(sitarWetGain);
-
-        // mix sitar
-        sitarDryGain.connect(preDelayGain);
-        sitarWetGain.connect(preDelayGain);
-
-        // delay
-        preDelayGain.connect(dryGain);
-        preDelayGain.connect(delayNode);
-        delayNode.connect(wetGain);
-        delayNode.connect(feedbackGain);
-        feedbackGain.connect(delayNode);
-
-        // to master
-        dryGain.connect(masterGainNode);
-        wetGain.connect(masterGainNode);
-
-        // reverb
-        masterGainNode.connect(reverbDry);
-        masterGainNode.connect(reverb);
-        reverb.connect(reverbWet);
-
-        reverbDry.connect(offlineCtx.destination);
-        reverbWet.connect(offlineCtx.destination);
-
-        src.start(0);
-
-        const rendered = await offlineCtx.startRendering();
-        setProcessedBuffer(rendered);
-        setProcessedWaveform(computeWaveform(rendered));
-        setStatus('Archivo procesado con Neon Sitar ✅');
-      } catch (err) {
-        console.error(err);
-        setStatus('Error al procesar archivo con Neon Sitar');
-      }
-    },
-    [
-      getOrCreateAudioContext,
-      delayTimeMs,
-      feedbackAmount,
-      mixAmount,
-      delayEnabled,
-      reverbAmount,
-      sitarAmount,
-      sitarMode,
-      ampMaster,
-      ampTone,
-      driveAmount,
-      driveEnabled,
-      masterVolume,
-      getReverbImpulse,
-    ],
+  const processFileThroughSitar = useCallback(async (file: File) => {
+  console.log('[offline] processing:', file.name);
+
+  const arr = await file.arrayBuffer();
+
+  // decode con un AudioContext temporal
+  const temp = new AudioContext();
+  const decoded = await temp.decodeAudioData(arr.slice(0));
+  await temp.close();
+
+  // Offline con el sampleRate del archivo
+  const offline = new OfflineAudioContext(
+    decoded.numberOfChannels,
+    decoded.length,
+    decoded.sampleRate
   );
+
+  const src = new AudioBufferSourceNode(offline, { buffer: decoded });
+
+  // settings actuales (usá TU fuente real)
+  const settings = getCurrentSettings(); // vos lo tenés en tu archivo (se ve en tu screenshot)
+
+const graph = buildOfflineFullGraph(offline, settings);
+
+
+
+  src.connect(graph.input);
+  graph.output.connect(offline.destination);
+
+  src.start(0);
+
+  const rendered = await offline.startRendering();
+
+  console.log('[offline] rendered RMS:', rms(rendered));
+
+  setProcessedBuffer(rendered);
+  console.log('[offline] rendered duration:', rendered.duration);
+console.log('[offline] rendered max:', Math.max(...rendered.getChannelData(0).slice(0, 50000).map(Math.abs)));
+
+
+  const wf = computeWaveform(rendered);
+  setProcessedWaveform(wf);
+}, [getCurrentSettings]);
+
 
   const setupRecordingGraph = useCallback(() => {
     if (!audioContext) return;
