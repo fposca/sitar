@@ -88,6 +88,18 @@ function audioBufferToWav(buffer: AudioBuffer): ArrayBuffer {
 
   return wav;
 }
+async function ensureContextRunning(ctx: AudioContext) {
+  if (ctx.state !== "running") {
+    await ctx.resume();
+  }
+  // warm-up ultra corto
+  const b = ctx.createBuffer(1, 1, ctx.sampleRate);
+  const s = ctx.createBufferSource();
+  s.buffer = b;
+  s.connect(ctx.destination);
+  s.start();
+  s.stop();
+}
 
 async function blobToAudioBuffer(ctx: AudioContext, blob: Blob) {
   const ab = await blob.arrayBuffer();
@@ -886,6 +898,11 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     ragaColor,
 
   ]);
+const ensureAudioRunning = async (ctx: AudioContext) => {
+  if (ctx.state === 'suspended') {
+    await ctx.resume();
+  }
+};
 
   const applySettings = (s: PresetSettings) => {
     setAmpGain(s.ampGain);
@@ -1305,314 +1322,275 @@ const punchRef = useRef<{ armed: boolean; sec: number }>({ armed: false, sec: 0 
 
   // Construye (una sola vez) el grafo de efectos de la guitarra.
   // Este mismo grafo se usa tanto para el monitor como para la grabación.
-  const ensureGuitarGraph = useCallback(() => {
-    if (!audioContext) return;
-    if (!guitarSourceRef.current) return;
-
-    // Si ya lo armamos, no volvemos a conectar nada
-    if (postFxGainRef.current) return;
-
-    const ctx = audioContext;
-    const guitarSource = guitarSourceRef.current;
-
-    // Forzar la guitarra a mono (un solo canal) para que salga centrada
-    const monoGain = ctx.createGain();
-    monoGain.channelCount = 1;
-    monoGain.channelCountMode = 'explicit';
-    guitarSource.connect(monoGain);
-
-    // === TONESTACK (Bass / Mid / Treble) ===
-    const bassFilter = ctx.createBiquadFilter();
-    bassFilter.type = 'lowshelf';
-    bassFilter.frequency.value = 120;
-    bassFilter.gain.value = (bassAmount - 0.5) * 12;
-    bassFilterRef.current = bassFilter;
-
-    const midFilter = ctx.createBiquadFilter();
-    midFilter.type = 'peaking';
-    midFilter.frequency.value = 900;
-    midFilter.Q.value = 1.0;
-    midFilter.gain.value = (midAmount - 0.5) * 10;
-    midFilterRef.current = midFilter;
-
-    const trebleFilter = ctx.createBiquadFilter();
-    trebleFilter.type = 'highshelf';
-    trebleFilter.frequency.value = 3500;
-    trebleFilter.gain.value = (trebleAmount - 0.5) * 12;
-    trebleFilterRef.current = trebleFilter;
-
-    // === AMP INPUT & DRIVE ===
-    const ampGainNode = ctx.createGain();
-    ampGainNode.gain.value = ampGain;
-    ampGainNodeRef.current = ampGainNode;
-
-    // ✅ Band-limit “de guitarra” ANTES del drive (mata RF antes de la no-linealidad)
-    const preDriveHP = ctx.createBiquadFilter();
-    preDriveHP.type = 'highpass';
-    preDriveHP.frequency.value = 85;  // 70..120 Hz
-    preDriveHP.Q.value = 0.707;
-
-    const preDriveLP = ctx.createBiquadFilter();
-    preDriveLP.type = 'lowpass';
-    preDriveLP.frequency.value = 4500; // 4500..6500 (clave contra “radio”)
-    preDriveLP.Q.value = 0.707;
-
-
-    const driveNode = ctx.createWaveShaper();
-    driveNode.curve = makeDriveCurve(driveMode, driveEnabled ? driveAmount : 0);
-    driveNode.oversample = '4x';
-    driveNodeRef.current = driveNode;
-    // ✅ anti-radio antes del drive (mata HF antes de distorsionar)
-    const antiRfPreDrive = ctx.createBiquadFilter();
-    antiRfPreDrive.type = 'lowpass';
-    antiRfPreDrive.frequency.value = 9500; // probá 8000..12000
-    antiRfPreDrive.Q.value = 0.7;
-    antiRfPreDriveRef.current = antiRfPreDrive;
-
-
-    const toneFilter = ctx.createBiquadFilter();
-    toneFilter.type = 'lowpass';
-
-    const minFreq = 200;
-    const maxFreq = 16000;
-    toneFilter.frequency.value = minFreq + ampTone * (maxFreq - minFreq);
-    toneFilterRef.current = toneFilter;
-
-    // ✅ TRUE BYPASS del drive (para que el shaper no procese nada cuando está OFF)
-    const driveDry = ctx.createGain();
-    const driveWet = ctx.createGain();
-    driveDry.gain.value = 1.0;
-    driveWet.gain.value = 0.0;
-
-    const driveOut = ctx.createGain();
-
-    driveDryRef.current = driveDry;
-    driveWetRef.current = driveWet;
-
-
-
-    // === COMPRESSOR (true bypass + parallel mix) ===
-    const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = compressorThreshold;
-    comp.ratio.value = compressorRatio;
-    comp.attack.value = compressorAttack;
-    comp.release.value = compressorRelease;
-    comp.knee.value = compressorKnee;
-    compNodeRef.current = comp;
-
-    const compMakeup = ctx.createGain();
-    compMakeup.gain.value = compressorMakeup;
-    compMakeupRef.current = compMakeup;
-
-    // router dry/wet
-    const compDry = ctx.createGain();
-    const compWet = ctx.createGain();
-    compDryRef.current = compDry;
-    compWetRef.current = compWet;
-
-    // por defecto OFF
-    compDry.gain.value = 1.0;
-    compWet.gain.value = 0.0;
-
-    // split desde toneFilter
-    toneFilter.connect(compDry);
-    toneFilter.connect(comp);
-
-    // comp path
-    comp.connect(compMakeup);
-    compMakeup.connect(compWet);
-
-    // sum
-    const compOut = ctx.createGain();
-    compDry.connect(compOut);
-    compWet.connect(compOut);
-    let preSitarNode: AudioNode = compOut;
-    preSitarNode = compOut;
-
-
-
-
-    // === MASTER GAIN NODE ===
-    const masterGain = ctx.createGain();
-    masterGain.gain.value = ampMaster * 2.0;
-    masterGainRef.current = masterGain;
-
-    // Declare preSitarNode here before first use
-
-
-    // === SYMPATHETIC STRINGS — brillo super agudo estilo sitar ===
-
-    // Filtro band-pass super agudo
-    const ragaSym = ctx.createBiquadFilter();
-    ragaSym.type = "bandpass";
-    ragaSym.frequency.value = 7000;   // MUY agudo
-    ragaSym.Q.value = 22;             // muy resonante / metálico
-
-    // Tiny vibrato → vibración típica del sitar real
-    const ragaLFO = ctx.createOscillator();
-    ragaLFO.type = "sine";
-    ragaLFO.frequency.value = 4.2; // vibración lenta estilo sitar
-
-    const ragaLFOgain = ctx.createGain();
-    ragaLFOgain.gain.value = 180; // mueve la frecuencia del resonador
-    ragaLFO.connect(ragaLFOgain);
-    ragaLFOgain.connect(ragaSym.frequency);
-    ragaLFO.start();
-
-    // ganancia de mezcla (controlada por el pedal Raga)
-    const ragaSymGain = ctx.createGain();
-    ragaSymGain.gain.value = 0; // se activa solo con el pedal
-
-    // Conexión en paralelo
-    // toneFilter.connect(ragaSym);
-    // ragaSym.connect(ragaSymGain);
-    // ragaSymGain.connect(masterGain);
-
-    // Referencias opcionales
-    ragaSympatheticRef.current = ragaSym;
-    ragaSympatheticGainRef.current = ragaSymGain;
-
-
-
-
-
-    // === SITAR SECTION ===
-    const sitarDryGain = ctx.createGain();
-    sitarDryGain.gain.value = 1 - sitarAmount;
-    sitarDryRef.current = sitarDryGain;
-
-    const sitarWetGain = ctx.createGain();
-    sitarWetGain.gain.value = sitarAmount;
-    sitarWetRef.current = sitarWetGain;
-
-    const sitarBandpass = ctx.createBiquadFilter();
-    sitarBandpass.type = 'bandpass';
-    const sitarSympathetic = ctx.createBiquadFilter();
-    sitarSympathetic.type = 'bandpass';
-    sitarBandpassRef.current = sitarBandpass;
-    sitarSympatheticRef.current = sitarSympathetic;
-
-    const jawariDrive = ctx.createWaveShaper();
-    jawariDrive.curve = makeDriveCurve('distortion', 0.55);
-    jawariDrive.oversample = '4x';
-    jawariDriveRef.current = jawariDrive;
-
-    const jawariDelay = ctx.createDelay(0.02);
-    jawariDelay.delayTime.value = 0.0015;
-
-    const jawariFeedback = ctx.createGain();
-    jawariFeedback.gain.value = 0.65;
-
-    const jawariHighpass = ctx.createBiquadFilter();
-    jawariHighpass.type = 'highpass';
-    jawariHighpass.frequency.value = 1800;
-    jawariHighpassRef.current = jawariHighpass;
-
-    // Aplicamos el modo actual
-    applySitarMode(sitarMode, {
-      sitarBandpass,
-      sitarSympathetic,
-      jawariDrive,
-      jawariHighpass,
-    });
-
-    // === DELAY & MIX ===
-    const preDelayGain = ctx.createGain();
-    preDelayGainRef.current = preDelayGain;
-
-    const dryGain = ctx.createGain();
-    dryGain.gain.value = 1 - mixAmount;
-    dryGainRef.current = dryGain;
-
-    const wetGain = ctx.createGain();
-    wetGain.gain.value = delayEnabled ? mixAmount : 0;
-    wetGainRef.current = wetGain;
-
-    const delayNode = ctx.createDelay(2.0);
-    // 🔽 Delay tone shaping (muy importante)
-    const delayHP = ctx.createBiquadFilter();
-    delayHP.type = 'highpass';
-    delayHP.frequency.value = 120; // 80–200 típico
-    delayHP.Q.value = 0.707;
-
-    const delayLP = ctx.createBiquadFilter();
-    delayLP.type = 'lowpass';
-    delayLP.frequency.value = 6000; // 3k–6k clave
-    delayLP.Q.value = 0.707;
-
-    delayNode.delayTime.value = delayTimeMs / 1000;
-    delayNodeRef.current = delayNode;
-
-    const feedbackGain = ctx.createGain();
-    feedbackGain.gain.value = feedbackAmount;
-    feedbackGainRef.current = feedbackGain;
-
-    // === REVERB ===
-
-    // Presence (post-master)
-    const presenceFilter = ctx.createBiquadFilter();
-    presenceFilter.type = 'highshelf';
-    presenceFilter.frequency.value = 5500;
-    presenceFilter.gain.value = (presenceAmount - 0.5) * 14;
-    presenceFilterRef.current = presenceFilter;
-
-    const reverbDry = ctx.createGain();
-    const reverbWet = ctx.createGain();
-    reverbDry.gain.value = 1 - reverbAmount;
-    reverbWet.gain.value = reverbAmount;
-    reverbDryRef.current = reverbDry;
-    reverbWetRef.current = reverbWet;
-
-    const reverb = ctx.createConvolver();
-    reverb.buffer = getReverbImpulse(ctx);
-
-    const postFxGain = ctx.createGain();
-    postFxGainRef.current = postFxGain;
-    // ✅ Analyser para UI (onda en vivo)
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.85;
-    analyserRef.current = analyser;
-
-    // postFxGain -> analyser (solo para medir, no cambia audio)
-    postFxGain.connect(analyser);
-
-
-    // === CONNECTIONS PRINCIPALES ===
-    // Input -> tonestack -> amp -> drive -> tone
-    monoGain.connect(bassFilter);
-    bassFilter.connect(midFilter);
-    midFilter.connect(trebleFilter);
-    trebleFilter.connect(ampGainNode);
-
-    // ✅ NUEVO orden: band-limit antes del drive
-    ampGainNode.connect(preDriveHP);
-    preDriveHP.connect(preDriveLP);
-    // split: dry directo + wet al shaper
-    preDriveLP.connect(driveDry);
-    // ✅ PAD antes del shaper (baja demodulación / “radio” cuando hay drive)
-    const drivePad = ctx.createGain();
-    drivePad.gain.value = 0.6; // probá 0.4..0.8
-
-    preDriveLP.connect(drivePad);
-    drivePad.connect(antiRfPreDrive);
-
-    antiRfPreDrive.connect(driveNode);
-    driveNode.connect(driveWet);
-
-    // sum
-    driveDry.connect(driveOut);
-    driveWet.connect(driveOut);
-
-    // ✅ filtro post-drive (mata fizz + restos de “radio”)
-    const postDriveLP = ctx.createBiquadFilter();
-    postDriveLP.type = 'lowpass';
-    postDriveLP.frequency.value = 5500; // probá 4500..8000
-    postDriveLP.Q.value = 0.707;
-
-    // a tone (ahora pasa por postDriveLP)
-    driveOut.connect(postDriveLP);
-    postDriveLP.connect(toneFilter);
+  const ensureGuitarGraph = useCallback((ctx: AudioContext) => {
+  if (!guitarSourceRef.current) return;
+
+  // Si ya lo armamos, no volvemos a conectar nada
+  if (postFxGainRef.current) return;
+
+  const guitarSource = guitarSourceRef.current;
+
+  // Forzar la guitarra a mono (un solo canal) para que salga centrada
+  const monoGain = ctx.createGain();
+  monoGain.channelCount = 1;
+  monoGain.channelCountMode = 'explicit';
+  guitarSource.connect(monoGain);
+
+  // === TONESTACK (Bass / Mid / Treble) ===
+  const bassFilter = ctx.createBiquadFilter();
+  bassFilter.type = 'lowshelf';
+  bassFilter.frequency.value = 120;
+  bassFilter.gain.value = (bassAmount - 0.5) * 12;
+  bassFilterRef.current = bassFilter;
+
+  const midFilter = ctx.createBiquadFilter();
+  midFilter.type = 'peaking';
+  midFilter.frequency.value = 900;
+  midFilter.Q.value = 1.0;
+  midFilter.gain.value = (midAmount - 0.5) * 10;
+  midFilterRef.current = midFilter;
+
+  const trebleFilter = ctx.createBiquadFilter();
+  trebleFilter.type = 'highshelf';
+  trebleFilter.frequency.value = 3500;
+  trebleFilter.gain.value = (trebleAmount - 0.5) * 12;
+  trebleFilterRef.current = trebleFilter;
+
+  // === AMP INPUT & DRIVE ===
+  const ampGainNode = ctx.createGain();
+  ampGainNode.gain.value = ampGain;
+  ampGainNodeRef.current = ampGainNode;
+
+  // ✅ Band-limit “de guitarra” ANTES del drive (mata RF antes de la no-linealidad)
+  const preDriveHP = ctx.createBiquadFilter();
+  preDriveHP.type = 'highpass';
+  preDriveHP.frequency.value = 85;  // 70..120 Hz
+  preDriveHP.Q.value = 0.707;
+
+  const preDriveLP = ctx.createBiquadFilter();
+  preDriveLP.type = 'lowpass';
+  preDriveLP.frequency.value = 4500; // 4500..6500 (clave contra “radio”)
+  preDriveLP.Q.value = 0.707;
+
+  const driveNode = ctx.createWaveShaper();
+  driveNode.curve = makeDriveCurve(driveMode, driveEnabled ? driveAmount : 0);
+  driveNode.oversample = '4x';
+  driveNodeRef.current = driveNode;
+
+  // ✅ anti-radio antes del drive (mata HF antes de distorsionar)
+  const antiRfPreDrive = ctx.createBiquadFilter();
+  antiRfPreDrive.type = 'lowpass';
+  antiRfPreDrive.frequency.value = 9500; // probá 8000..12000
+  antiRfPreDrive.Q.value = 0.7;
+  antiRfPreDriveRef.current = antiRfPreDrive;
+
+  const toneFilter = ctx.createBiquadFilter();
+  toneFilter.type = 'lowpass';
+  const minFreq = 200;
+  const maxFreq = 16000;
+  toneFilter.frequency.value = minFreq + ampTone * (maxFreq - minFreq);
+  toneFilterRef.current = toneFilter;
+
+  // ✅ TRUE BYPASS del drive
+  const driveDry = ctx.createGain();
+  const driveWet = ctx.createGain();
+  driveDry.gain.value = 1.0;
+  driveWet.gain.value = 0.0;
+
+  const driveOut = ctx.createGain();
+
+  driveDryRef.current = driveDry;
+  driveWetRef.current = driveWet;
+
+  // === COMPRESSOR (true bypass + parallel mix) ===
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = compressorThreshold;
+  comp.ratio.value = compressorRatio;
+  comp.attack.value = compressorAttack;
+  comp.release.value = compressorRelease;
+  comp.knee.value = compressorKnee;
+  compNodeRef.current = comp;
+
+  const compMakeup = ctx.createGain();
+  compMakeup.gain.value = compressorMakeup;
+  compMakeupRef.current = compMakeup;
+
+  const compDry = ctx.createGain();
+  const compWet = ctx.createGain();
+  compDryRef.current = compDry;
+  compWetRef.current = compWet;
+
+  compDry.gain.value = 1.0;
+  compWet.gain.value = 0.0;
+
+  // split desde toneFilter
+  toneFilter.connect(compDry);
+  toneFilter.connect(comp);
+
+  comp.connect(compMakeup);
+  compMakeup.connect(compWet);
+
+  const compOut = ctx.createGain();
+  compDry.connect(compOut);
+  compWet.connect(compOut);
+
+  let preSitarNode: AudioNode = compOut;
+
+  // === MASTER GAIN NODE ===
+  const masterGain = ctx.createGain();
+  masterGain.gain.value = ampMaster * 2.0;
+  masterGainRef.current = masterGain;
+
+  // === SYMPATHETIC STRINGS (refs) ===
+  const ragaSym = ctx.createBiquadFilter();
+  ragaSym.type = "bandpass";
+  ragaSym.frequency.value = 7000;
+  ragaSym.Q.value = 22;
+
+  const ragaLFO = ctx.createOscillator();
+  ragaLFO.type = "sine";
+  ragaLFO.frequency.value = 4.2;
+
+  const ragaLFOgain = ctx.createGain();
+  ragaLFOgain.gain.value = 180;
+  ragaLFO.connect(ragaLFOgain);
+  ragaLFOgain.connect(ragaSym.frequency);
+  ragaLFO.start();
+
+  const ragaSymGain = ctx.createGain();
+  ragaSymGain.gain.value = 0;
+
+  ragaSympatheticRef.current = ragaSym;
+  ragaSympatheticGainRef.current = ragaSymGain;
+
+  // === SITAR SECTION ===
+  const sitarDryGain = ctx.createGain();
+  sitarDryGain.gain.value = 1 - sitarAmount;
+  sitarDryRef.current = sitarDryGain;
+
+  const sitarWetGain = ctx.createGain();
+  sitarWetGain.gain.value = sitarAmount;
+  sitarWetRef.current = sitarWetGain;
+
+  const sitarBandpass = ctx.createBiquadFilter();
+  sitarBandpass.type = 'bandpass';
+  const sitarSympathetic = ctx.createBiquadFilter();
+  sitarSympathetic.type = 'bandpass';
+  sitarBandpassRef.current = sitarBandpass;
+  sitarSympatheticRef.current = sitarSympathetic;
+
+  const jawariDrive = ctx.createWaveShaper();
+  jawariDrive.curve = makeDriveCurve('distortion', 0.55);
+  jawariDrive.oversample = '4x';
+  jawariDriveRef.current = jawariDrive;
+
+  const jawariDelay = ctx.createDelay(0.02);
+  jawariDelay.delayTime.value = 0.0015;
+
+  const jawariFeedback = ctx.createGain();
+  jawariFeedback.gain.value = 0.65;
+
+  const jawariHighpass = ctx.createBiquadFilter();
+  jawariHighpass.type = 'highpass';
+  jawariHighpass.frequency.value = 1800;
+  jawariHighpassRef.current = jawariHighpass;
+
+  applySitarMode(sitarMode, {
+    sitarBandpass,
+    sitarSympathetic,
+    jawariDrive,
+    jawariHighpass,
+  });
+
+  // === DELAY & MIX ===
+  const preDelayGain = ctx.createGain();
+  preDelayGainRef.current = preDelayGain;
+
+  const dryGain = ctx.createGain();
+  dryGain.gain.value = 1 - mixAmount;
+  dryGainRef.current = dryGain;
+
+  const wetGain = ctx.createGain();
+  wetGain.gain.value = delayEnabled ? mixAmount : 0;
+  wetGainRef.current = wetGain;
+
+  const delayNode = ctx.createDelay(2.0);
+
+  const delayHP = ctx.createBiquadFilter();
+  delayHP.type = 'highpass';
+  delayHP.frequency.value = 120;
+  delayHP.Q.value = 0.707;
+
+  const delayLP = ctx.createBiquadFilter();
+  delayLP.type = 'lowpass';
+  delayLP.frequency.value = 6000;
+  delayLP.Q.value = 0.707;
+
+  delayNode.delayTime.value = delayTimeMs / 1000;
+  delayNodeRef.current = delayNode;
+
+  const feedbackGain = ctx.createGain();
+  feedbackGain.gain.value = feedbackAmount;
+  feedbackGainRef.current = feedbackGain;
+
+  // === REVERB / PRESENCE ===
+  const presenceFilter = ctx.createBiquadFilter();
+  presenceFilter.type = 'highshelf';
+  presenceFilter.frequency.value = 5500;
+  presenceFilter.gain.value = (presenceAmount - 0.5) * 14;
+  presenceFilterRef.current = presenceFilter;
+
+  const reverbDry = ctx.createGain();
+  const reverbWet = ctx.createGain();
+  reverbDry.gain.value = 1 - reverbAmount;
+  reverbWet.gain.value = reverbAmount;
+  reverbDryRef.current = reverbDry;
+  reverbWetRef.current = reverbWet;
+
+  const reverb = ctx.createConvolver();
+  reverb.buffer = getReverbImpulse(ctx);
+
+  const postFxGain = ctx.createGain();
+  postFxGainRef.current = postFxGain;
+
+  // ✅ Analyser para UI
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.85;
+  analyserRef.current = analyser;
+  postFxGain.connect(analyser);
+
+  // === CONNECTIONS PRINCIPALES ===
+  monoGain.connect(bassFilter);
+  bassFilter.connect(midFilter);
+  midFilter.connect(trebleFilter);
+  trebleFilter.connect(ampGainNode);
+
+  ampGainNode.connect(preDriveHP);
+  preDriveHP.connect(preDriveLP);
+
+  // split: dry directo + wet al shaper
+  preDriveLP.connect(driveDry);
+
+  const drivePad = ctx.createGain();
+  drivePad.gain.value = 0.6;
+
+  preDriveLP.connect(drivePad);
+  drivePad.connect(antiRfPreDrive);
+
+  antiRfPreDrive.connect(driveNode);
+  driveNode.connect(driveWet);
+
+  driveDry.connect(driveOut);
+  driveWet.connect(driveOut);
+
+  const postDriveLP = ctx.createBiquadFilter();
+  postDriveLP.type = 'lowpass';
+  postDriveLP.frequency.value = 5500;
+  postDriveLP.Q.value = 0.707;
+
+  driveOut.connect(postDriveLP);
+  postDriveLP.connect(toneFilter); postDriveLP.connect(toneFilter);
 
 
 
@@ -2049,7 +2027,7 @@ const punchRef = useRef<{ armed: boolean; sec: number }>({ armed: false, sec: 0 
 
     // Monitor bus → parlantes (control por ganancia)
     const monitorGain = ctx.createGain();
-    monitorGain.gain.value = monitorEnabled ? 1 : 0;
+   monitorGain.gain.value = 1
     monitorGainRef.current = monitorGain;
 
     // === MASTER GLOBAL ===
@@ -2095,35 +2073,46 @@ const punchRef = useRef<{ armed: boolean; sec: number }>({ armed: false, sec: 0 
   ]);
   // Entrada de guitarra
   const setupGuitarInput = useCallback(async () => {
-    try {
-      const ctx = getOrCreateAudioContext();
+  try {
+    const ctx = getOrCreateAudioContext();
 
-      if (!guitarStreamRef.current) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-          },
-        });
-        guitarStreamRef.current = stream;
-      }
+    // 👇 VA ACÁ (inmediatamente después de obtener ctx)
+    await ensureAudioRunning(ctx);
 
-      if (!guitarSourceRef.current && guitarStreamRef.current) {
-        const src = ctx.createMediaStreamSource(guitarStreamRef.current);
-        guitarSourceRef.current = src;
-      }
-
-      // Armamos el grafo de FX apenas tenemos la entrada
-      ensureGuitarGraph();
-
-      setIsInputReady(true);
-      setStatus('Entrada de guitarra lista ✅');
-    } catch (err) {
-      console.error(err);
-      setStatus('Error al acceder al micrófono/placa');
+    if (!guitarStreamRef.current) {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+      guitarStreamRef.current = stream;
     }
-  }, [getOrCreateAudioContext, ensureGuitarGraph]);
+
+    if (!guitarSourceRef.current && guitarStreamRef.current) {
+      const src = ctx.createMediaStreamSource(guitarStreamRef.current);
+      guitarSourceRef.current = src;
+    }
+
+    // Armamos el grafo de FX apenas tenemos la entrada
+    ensureGuitarGraph(ctx);
+
+    // 👇 CLAVE
+setMonitorEnabled(true);
+
+setIsInputReady(true);
+    // 🔊 activar monitor al configurar entrada
+setMonitorEnabled(true);
+    setStatus('Entrada de guitarra lista ✅');
+  } catch (err) {
+    console.error(err);
+    setStatus('Error al acceder al micrófono/placa');
+  }
+}, [getOrCreateAudioContext, ensureGuitarGraph]);
+
+
+
   const getAnalyserNode = useCallback(() => analyserRef.current, []);
   // Cargar backing
   const loadBackingFile = useCallback(
@@ -2313,6 +2302,14 @@ const punchRef = useRef<{ armed: boolean; sec: number }>({ armed: false, sec: 0 
       recordGainRef.current.connect(destNode);
     }
   }, [audioContext]);
+useEffect(() => {
+  if (!audioContext || !monitorGainRef.current) return;
+  monitorGainRef.current.gain.setTargetAtTime(
+    monitorEnabled ? 1 : 0,
+    audioContext.currentTime,
+    0.05
+  );
+}, [monitorEnabled, audioContext]);
 
   useEffect(() => {
     if (!audioContext) return;
@@ -2610,7 +2607,7 @@ const punchRef = useRef<{ armed: boolean; sec: number }>({ armed: false, sec: 0 
     }
 
     // Ensure main guitar FX graph exists
-    ensureGuitarGraph();
+    ensureGuitarGraph(ctx);
 
     const postFxGain = postFxGainRef.current;
     if (!postFxGain) {
@@ -3012,15 +3009,22 @@ const punchRef = useRef<{ armed: boolean; sec: number }>({ armed: false, sec: 0 
   }, [presenceAmount, audioContext]);
 
   // Monitor on/off → cambiamos ganancia
-  useEffect(() => {
-    if (!audioContext) return;
-    if (!monitorGainRef.current) return;
-    monitorGainRef.current.gain.setTargetAtTime(
-      monitorEnabled ? 1 : 0,
-      audioContext.currentTime,
-      0.05
-    );
-  }, [monitorEnabled, audioContext]);
+useEffect(() => {
+  if (!audioContext) return;
+  if (!monitorGainRef.current) return;
+
+  // 🔥 CLAVE ABSOLUTA
+  if (monitorEnabled) {
+    ensureAudioRunning(audioContext);
+  }
+
+  monitorGainRef.current.gain.setTargetAtTime(
+    monitorEnabled ? 1 : 0,
+    audioContext.currentTime,
+    0.05
+  );
+}, [monitorEnabled, audioContext]);
+
 
   // Sitar amount
   useEffect(() => {
