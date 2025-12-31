@@ -38,6 +38,11 @@ export type PresetSettings = {
   feedbackAmount: number;
   mixAmount: number;
 
+  // 🔥 Delay extras
+  delayHPHz: number;        // High-pass del delay (Hz)
+  delayLPHz: number;        // Low-pass del delay (Hz)
+  delayModRate: number;     // Hz (0..2)
+  delayModDepthMs: number;  // ms (0..20)
   // Reverb
   reverbAmount: number; // 0..1
 
@@ -134,6 +139,19 @@ export type AudioEngineContextValue = {
   // Volumen del backing
   backingVolume: number;
   setBackingVolume: (v: number) => void;
+
+  // 🔥 Delay extras
+  delayHPHz: number;
+  setDelayHPHz: (v: number) => void;
+
+  delayLPHz: number;
+  setDelayLPHz: (v: number) => void;
+
+  delayModRate: number;
+  setDelayModRate: (v: number) => void;
+
+  delayModDepthMs: number;
+  setDelayModDepthMs: (v: number) => void;
 
   backingName: string | null;
   backingWaveform: number[] | null;

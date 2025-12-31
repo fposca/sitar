@@ -173,6 +173,11 @@ const PRESETS: Record<
       delayTimeMs: 280,
       feedbackAmount: 0.12,
       mixAmount: 0.10,
+      // ✅ Delay extras (nuevo)
+      delayHPHz: 120,        // corta graves del eco
+      delayLPHz: 6500,       // oscurece un poco el eco
+      delayModRate: 0.35,    // Hz (vibrato lento)
+      delayModDepthMs: 3.0,  // ms (micro wobble)
 
       reverbAmount: 0.5,
 
@@ -212,176 +217,171 @@ const PRESETS: Record<
       ragaResonance: 0.45,
       ragaDroneLevel: 0.25,
       ragaColor: 0.5,
-      isPunchArmed: false,
-      armPunchIn: function (cursorSec: number): void {
-        throw new Error('Function not implemented.');
-      },
-      setIsPunchArmed: function (v: boolean): void {
-        throw new Error('Function not implemented.');
-      }
+      driveMode: 'overdrive'
     },
   },
   desertLead: {
-     label: 'Rock Crunch',
-  description: 'Crunch clásico, definido, sin delay ni raga.',
-  settings: {
-    // ✅ COMPRESSOR (suave para emparejar)
-    compressorEnabled: true,
-    compressorThreshold: -22,
-    compressorRatio: 3,
-    compressorAttack: 0.01,
-    compressorRelease: 0.18,
-    compressorKnee: 12,
-    compressorMakeup: 1.05,
-    compressorMix: 0.65,
+    label: 'Rock Crunch',
+    description: 'Crunch clásico, definido, sin delay ni raga.',
+    settings: {
+      // ✅ COMPRESSOR (suave para emparejar)
+      compressorEnabled: true,
+      compressorThreshold: -22,
+      compressorRatio: 3,
+      compressorAttack: 0.01,
+      compressorRelease: 0.18,
+      compressorKnee: 12,
+      compressorMakeup: 1.05,
+      compressorMix: 0.65,
 
-    // AMP / EQ
-    ampGain: 1.15,
-    ampTone: 0.52,
-    ampMaster: 1.15,
-    bassAmount: 0.52,
-    midAmount: 0.62,
-    trebleAmount: 0.55,
-    presenceAmount: 0.58,
+      // AMP / EQ
+      ampGain: 1.15,
+      ampTone: 0.52,
+      ampMaster: 1.15,
+      bassAmount: 0.52,
+      midAmount: 0.62,
+      trebleAmount: 0.55,
+      presenceAmount: 0.58,
 
-    // DRIVE (crunch controlado)
-    driveAmount: 0.48,
-    driveEnabled: true,
+      // DRIVE (crunch controlado)
+      driveAmount: 0.48,
+      driveEnabled: true,
 
-    // ❌ DELAY OFF
-    delayEnabled: false,
-    delayTimeMs: 300,
-    feedbackAmount: 0.0,
-    mixAmount: 0.0,
+      // ❌ DELAY OFF
+      delayEnabled: false,
+      delayTimeMs: 300,
+      feedbackAmount: 0.0,
+      mixAmount: 0.0,
+      // ✅ Delay extras (nuevo)
+      delayHPHz: 180,
+      delayLPHz: 7000,
+      delayModRate: 0.0,
+      delayModDepthMs: 0.0,
 
-    // REVERB leve (ambiente)
-    reverbAmount: 0.22,
+      // REVERB leve (ambiente)
+      reverbAmount: 0.22,
 
-    // ❌ SITAR OFF (clave anti “radio”)
-    sitarAmount: 0.0,
-    sitarMode: 'exotic', // da igual si amount=0
-
-    // ❌ MODS OFF (phaser/flanger)
-    phaserEnabled: false,
-    phaserRate: 0.12,
-    phaserDepth: 0.0,
-    phaserFeedback: 0.0,
-    phaserMix: 0.0,
-    phaserCenter: 0.5,
-
-    flangerEnabled: false,
-    flangerRate: 0.18,
-    flangerDepth: 0.0,
-    flangerMix: 0.0,
-    flangerFeedback: 0.0,
-
-    // ❌ OCTAVE OFF
-    octaveEnabled: false,
-    octaveTone: 0.5,
-    octaveLevel: 1.0,
-    octaveMix: 0.0,
-
-    // ✅ Valve apagado (por ahora)
-    valveEnabled: false,
-    valveDrive: 0.55,
-    valveTone: 0.55,
-    valveLevel: 1.0,
-    valveMode: 'crunch',
-
-    // ❌ RAGA OFF (y todo en cero)
-    ragaEnabled: false,
-    ragaResonance: 0.0,
-    ragaDroneLevel: 0.0,
-    ragaColor: 0.0,
-
-    // (si tu EngineSettings todavía exige esto, dejalo igual que ya lo tenías)
-    isPunchArmed: false,
-    armPunchIn: function (): void { throw new Error('Function not implemented.'); },
-    setIsPunchArmed: function (): void { throw new Error('Function not implemented.'); },
-  },
-},
-  infernalRaga: {
-  label: 'Rock Heavy',
-  description: 'Tight y definido, sin drive (cabezal), sin delay ni raga.',
-  settings: {
-    // ✅ COMPRESSOR
-    compressorEnabled: true,
-    compressorThreshold: -24,
-    compressorRatio: 4,
-    compressorAttack: 0.008,
-    compressorRelease: 0.16,
-    compressorKnee: 14,
-    compressorMakeup: 1.08,
-    compressorMix: 0.7,
-
-    // AMP / EQ
-    ampGain: 1.25,
-    ampTone: 0.45,
-    ampMaster: 1.2,
-    bassAmount: 0.5,
-    midAmount: 0.58,
-    trebleAmount: 0.5,
-    presenceAmount: 0.52,
-
-    // ✅ DRIVE (pero arrancá OFF)
-    driveAmount: 0.72,
-    driveEnabled: false, // 👈 CAMBIO
+      // ❌ SITAR OFF (clave anti “radio”)
+      sitarAmount: 0.0,
+      sitarMode: 'exotic', // da igual si amount=0
 
 
-    // ❌ DELAY OFF
-    delayEnabled: false,
-    delayTimeMs: 340,
-    feedbackAmount: 0.0,
-    mixAmount: 0.0,
+      // ❌ MODS OFF (phaser/flanger)
+      phaserEnabled: false,
+      phaserRate: 0.12,
+      phaserDepth: 0.0,
+      phaserFeedback: 0.0,
+      phaserMix: 0.0,
+      phaserCenter: 0.5,
 
-    // REVERB
-    reverbAmount: 0.18,
+      flangerEnabled: false,
+      flangerRate: 0.18,
+      flangerDepth: 0.0,
+      flangerMix: 0.0,
+      flangerFeedback: 0.0,
 
-    // ❌ SITAR OFF
-    sitarAmount: 0.0,
-    sitarMode: 'sharp',
+      // ❌ OCTAVE OFF
+      octaveEnabled: false,
+      octaveTone: 0.5,
+      octaveLevel: 1.0,
+      octaveMix: 0.0,
 
-    // ❌ MODS OFF
-    phaserEnabled: false,
-    phaserRate: 0.15,
-    phaserDepth: 0.0,
-    phaserFeedback: 0.0,
-    phaserMix: 0.0,
-    phaserCenter: 0.5,
+      // ✅ Valve apagado (por ahora)
+      valveEnabled: false,
+      valveDrive: 0.55,
+      valveTone: 0.55,
+      valveLevel: 1.0,
+      valveMode: 'crunch',
 
-    flangerEnabled: false,
-    flangerRate: 0.1,
-    flangerDepth: 0.0,
-    flangerMix: 0.0,
-    flangerFeedback: 0.0,
-
-    // OCTAVE (dejé tal cual lo tenías)
-    octaveEnabled: true,
-    octaveTone: 0.5,
-    octaveLevel: 1.0,
-    octaveMix: 0.3,
-
-    // Valve (dejé tal cual lo tenías)
-    valveEnabled: true,
-    valveDrive: 0.95,
-    valveTone: 0.65,
-    valveLevel: 0.65,
-    valveMode: 'distortion',
-
-    // ❌ RAGA OFF
-    ragaEnabled: false,
-    ragaResonance: 0.0,
-    ragaDroneLevel: 0.0,
-    ragaColor: 0.0,
-    isPunchArmed: false,
-    armPunchIn: function (): void {
-      throw new Error('Function not implemented.');
+      // ❌ RAGA OFF (y todo en cero)
+      ragaEnabled: false,
+      ragaResonance: 0.0,
+      ragaDroneLevel: 0.0,
+      ragaColor: 0.0,
+      driveMode: 'crunch'
     },
-    setIsPunchArmed: function (): void {
-      throw new Error('Function not implemented.');
-    }
   },
-},
+  infernalRaga: {
+    label: 'Rock Heavy',
+    description: 'Tight y definido, sin drive (cabezal), sin delay ni raga.',
+    settings: {
+      // ✅ COMPRESSOR
+      compressorEnabled: true,
+      compressorThreshold: -24,
+      compressorRatio: 4,
+      compressorAttack: 0.008,
+      compressorRelease: 0.16,
+      compressorKnee: 14,
+      compressorMakeup: 1.08,
+      compressorMix: 0.7,
+
+      // AMP / EQ
+      ampGain: 1.25,
+      ampTone: 0.45,
+      ampMaster: 1.2,
+      bassAmount: 0.5,
+      midAmount: 0.58,
+      trebleAmount: 0.5,
+      presenceAmount: 0.52,
+
+      // ✅ DRIVE (pero arrancá OFF)
+      driveAmount: 0.72,
+      driveEnabled: false, // 👈 CAMBIO
+      // ✅ Delay extras (nuevo)
+      delayHPHz: 200,
+      delayLPHz: 6000,
+      delayModRate: 0.0,
+      delayModDepthMs: 0.0,
+
+
+      // ❌ DELAY OFF
+      delayEnabled: false,
+      delayTimeMs: 340,
+      feedbackAmount: 0.0,
+      mixAmount: 0.0,
+
+      // REVERB
+      reverbAmount: 0.18,
+
+      // ❌ SITAR OFF
+      sitarAmount: 0.0,
+      sitarMode: 'sharp',
+
+      // ❌ MODS OFF
+      phaserEnabled: false,
+      phaserRate: 0.15,
+      phaserDepth: 0.0,
+      phaserFeedback: 0.0,
+      phaserMix: 0.0,
+      phaserCenter: 0.5,
+
+      flangerEnabled: false,
+      flangerRate: 0.1,
+      flangerDepth: 0.0,
+      flangerMix: 0.0,
+      flangerFeedback: 0.0,
+
+      // OCTAVE (dejé tal cual lo tenías)
+      octaveEnabled: true,
+      octaveTone: 0.5,
+      octaveLevel: 1.0,
+      octaveMix: 0.3,
+
+      // Valve (dejé tal cual lo tenías)
+      valveEnabled: true,
+      valveDrive: 0.95,
+      valveTone: 0.65,
+      valveLevel: 0.65,
+      valveMode: 'distortion',
+
+      // ❌ RAGA OFF
+      ragaEnabled: false,
+      ragaResonance: 0.0,
+      ragaDroneLevel: 0.0,
+      ragaColor: 0.0,
+      driveMode: 'distortion'
+    },
+  },
 };
 
 /* ---------- SKINS VISUALES POR PRESET ---------- */
@@ -738,6 +738,15 @@ const AmpPanel: React.FC = () => {
     setCompressorMakeup,
     compressorMix,
     setCompressorMix,
+    // 🔥 Delay extras
+    delayHPHz,
+    setDelayHPHz,
+    delayLPHz,
+    setDelayLPHz,
+    delayModRate,
+    setDelayModRate,
+    delayModDepthMs,
+    setDelayModDepthMs,
 
   } = useAudioEngine();
   // const { applySettings } = useAudioEngine();
@@ -1785,86 +1794,152 @@ const AmpPanel: React.FC = () => {
                     {/* --------- PEDAL DELAY ---------- */}
                     <div
                       style={{
+                        position: 'relative',
+                        width: 260,
+                        height: 420,
+                        backgroundImage: `url(${pedalImg})`,
+                        backgroundSize: 'contain',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'center',
                         display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '0.8rem',
+                        alignItems: 'flex-end',
+                        justifyContent: 'center',
+                        paddingBottom: '1.4rem',
                       }}
                     >
+                      {/* ===== FILA 1 (Time / FB / Mix) ===== */}
                       <div
                         style={{
-                          position: 'relative',
-                          width: 260,
-                          height: 420,
-                          backgroundImage: `url(${pedalImg})`,
-                          backgroundSize: 'contain',
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'center',
                           display: 'flex',
-                          alignItems: 'flex-end',
-                          justifyContent: 'center',
-                          paddingBottom: '1.4rem',
+                          padding: '0.4rem 0.7rem',
+                          borderRadius: 999,
+                          backdropFilter: 'blur(4px)',
+                          background: 'rgba(0,0,0,0.4)',
+                          position: 'absolute',
+                          top: '159px',              // 👈 subí un toque la fila 1
+                          gap: '0.5rem',
                         }}
                       >
-                        <div
-                          style={{
-                            display: 'flex',
-                            padding: '0.4rem 0.7rem',
-                            borderRadius: 999,
-                            backdropFilter: 'blur(4px)',
-                            background: 'rgba(0,0,0,0.4)',
-                            position: 'absolute',
-                            top: '255px',
-                            gap: '0.5rem',
+                        <Knob
+                          label="Time"
+                          min={50}
+                          max={1000}
+                          value={delayTimeMs}
+                          onChange={(v) => {
+                            setDelayTimeMs(v);
+                            markCustom();
                           }}
-                        >
-                          <Knob
-                            label="Time"
-                            min={50}
-                            max={1000}
-                            value={delayTimeMs}
-                            onChange={(v) => {
-                              setDelayTimeMs(v);
-                              markCustom();
-                            }}
-                            display={`${Math.round(delayTimeMs)} ms`}
-                            labelColor="#f9fafb"
-                            valueColor="#e5e7eb"
-                            faceGradient={skin.knobFaceGradient}
-                          />
+                          display={`${Math.round(delayTimeMs)} ms`}
+                          labelColor="#f9fafb"
+                          valueColor="#e5e7eb"
+                          faceGradient={skin.knobFaceGradient}
+                        />
 
-                          <Knob
-                            label="Feedback"
-                            min={0}
-                            max={90}
-                            value={feedbackAmount * 100}
-                            onChange={(v) => {
-                              setFeedbackAmount(v / 100);
-                              markCustom();
-                            }}
-                            display={`${Math.round(feedbackAmount * 100)}%`}
-                            labelColor="#f9fafb"
-                            valueColor="#e5e7eb"
-                            faceGradient={skin.knobFaceGradient}
-                          />
+                        <Knob
+                          label="FB"
+                          min={0}
+                          max={90}
+                          value={feedbackAmount * 100}
+                          onChange={(v) => {
+                            setFeedbackAmount(v / 100);
+                            markCustom();
+                          }}
+                          display={`${Math.round(feedbackAmount * 100)}%`}
+                          labelColor="#f9fafb"
+                          valueColor="#e5e7eb"
+                          faceGradient={skin.knobFaceGradient}
+                        />
 
-                          <Knob
-                            label="Mix"
-                            min={0}
-                            max={100}
-                            value={mixAmount * 100}
-                            onChange={(v) => {
-                              setMixAmount(v / 100);
-                              markCustom();
-                            }}
-                            display={`${Math.round(mixAmount * 100)}%`}
-                            labelColor="#f9fafb"
-                            valueColor="#e5e7eb"
-                            faceGradient={skin.knobFaceGradient}
-                          />
-                        </div>
+                        <Knob
+                          label="Mix"
+                          min={0}
+                          max={100}
+                          value={mixAmount * 100}
+                          onChange={(v) => {
+                            setMixAmount(v / 100);
+                            markCustom();
+                          }}
+                          display={`${Math.round(mixAmount * 100)}%`}
+                          labelColor="#f9fafb"
+                          valueColor="#e5e7eb"
+                          faceGradient={skin.knobFaceGradient}
+                        />
                       </div>
 
+                      {/* ===== FILA 2 (Tone + Mod) ===== */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          padding: '0.4rem 0.7rem',
+                          borderRadius: 999,
+                          backdropFilter: 'blur(4px)',
+                          background: 'rgba(0,0,0,0.4)',
+                          position: 'absolute',
+                          top: '260x',              // 👈 fila 2 más abajo
+                          gap: '0.5rem',
+                        }}
+                      >
+                        <Knob
+                          label="HP"
+                          min={20}
+                          max={800}
+                          value={delayHPHz}
+                          onChange={(v) => {
+                            setDelayHPHz(v);
+                            markCustom();
+                          }}
+                          display={`${Math.round(delayHPHz)} Hz`}
+                          labelColor="#f9fafb"
+                          valueColor="#e5e7eb"
+                          faceGradient={skin.knobFaceGradient}
+                        />
+
+                        <Knob
+                          label="LP"
+                          min={1000}
+                          max={12000}
+                          value={delayLPHz}
+                          onChange={(v) => {
+                            setDelayLPHz(v);
+                            markCustom();
+                          }}
+                          display={`${Math.round(delayLPHz / 1000)} k`}
+                          labelColor="#f9fafb"
+                          valueColor="#e5e7eb"
+                          faceGradient={skin.knobFaceGradient}
+                        />
+
+                        <Knob
+                          label="Rate"
+                          min={0}
+                          max={200}
+                          value={Math.round(delayModRate * 100)} // 0..2Hz -> 0..200
+                          onChange={(v) => {
+                            setDelayModRate(v / 100);
+                            markCustom();
+                          }}
+                          display={`${delayModRate.toFixed(2)} Hz`}
+                          labelColor="#f9fafb"
+                          valueColor="#e5e7eb"
+                          faceGradient={skin.knobFaceGradient}
+                        />
+
+                        <Knob
+                          label="Depth"
+                          min={0}
+                          max={20}                   // 0..20ms
+                          value={delayModDepthMs}
+                          onChange={(v) => {
+                            setDelayModDepthMs(v);
+                            markCustom();
+                          }}
+                          display={`${delayModDepthMs.toFixed(1)} ms`}
+                          labelColor="#f9fafb"
+                          valueColor="#e5e7eb"
+                          faceGradient={skin.knobFaceGradient}
+                        />
+                      </div>
+                      {/* ✅ BOTÓN ON/OFF (DELAY) */}
                       <button
                         type="button"
                         onClick={() => {
@@ -1872,17 +1947,18 @@ const AmpPanel: React.FC = () => {
                           markCustom();
                         }}
                         style={{
+                          position: 'absolute',
+                          bottom: -43,
+                          width: 144,
+                          // 👈 ajustá según tu PNG (zona footswitch)
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          zIndex: 5,                // 👈 arriba de las filas
                           padding: '0.55rem 1.4rem',
                           borderRadius: '999px',
-                          border: delayEnabled
-                            ? skin.delayOnBorder
-                            : skin.delayOffBorder,
-                          background: delayEnabled
-                            ? skin.delayOnBg
-                            : skin.delayOffBg,
-                          color: delayEnabled
-                            ? skin.delayOnTextColor
-                            : skin.delayOffTextColor,
+                          border: delayEnabled ? skin.delayOnBorder : skin.delayOffBorder,
+                          background: delayEnabled ? skin.delayOnBg : skin.delayOffBg,
+                          color: delayEnabled ? skin.delayOnTextColor : skin.delayOffTextColor,
                           fontSize: '0.7rem',
                           textTransform: 'uppercase',
                           letterSpacing: '0.16em',
@@ -1890,9 +1966,8 @@ const AmpPanel: React.FC = () => {
                           alignItems: 'center',
                           gap: '0.45rem',
                           cursor: 'pointer',
-                          boxShadow: delayEnabled
-                            ? skin.controlOnShadow
-                            : skin.controlOffShadow,
+                          boxShadow: delayEnabled ? skin.controlOnShadow : skin.controlOffShadow,
+                          backdropFilter: 'blur(4px)',
                         }}
                       >
                         <span
@@ -1900,14 +1975,13 @@ const AmpPanel: React.FC = () => {
                             width: 10,
                             height: 10,
                             borderRadius: '999px',
-                            background: delayEnabled
-                              ? skin.delayOnDotBg
-                              : skin.delayOffDotBg,
+                            background: delayEnabled ? skin.delayOnDotBg : skin.delayOffDotBg,
                           }}
                         />
                         {delayEnabled ? 'Delay On' : 'Delay Off'}
                       </button>
                     </div>
+
 
                     {/* ✅ PHASER */}
                     <div

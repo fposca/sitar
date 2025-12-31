@@ -133,12 +133,16 @@ const DEFAULTS: EngineSettingsV1 = {
   // ✅ Compressor (valores válidos)
   compressorEnabled: false,
   compressorThreshold: -24, // dB, típico
-  compressorRatio: 4,       // [1..20]
-  compressorAttack: 0.01,   // segundos (>0)
-  compressorRelease: 0.12,  // segundos
-  compressorKnee: 20,       // dB
-  compressorMakeup: 1.0,    // gain
-  compressorMix: 1.0,       // 0..1
+  compressorRatio: 4, // [1..20]
+  compressorAttack: 0.01, // segundos (>0)
+  compressorRelease: 0.12, // segundos
+  compressorKnee: 20, // dB
+  compressorMakeup: 1.0, // gain
+  compressorMix: 1.0,
+  delayHPHz: 0,
+  delayLPHz: 0,
+  delayModRate: 0,
+  delayModDepthMs: 0
 };
 
 function sanitizeSettingsV1(raw: any): EngineSettingsV1 | null {

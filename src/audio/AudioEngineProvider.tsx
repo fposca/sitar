@@ -9,7 +9,6 @@ import React, {
 } from 'react';
 import type { AudioEngineContextValue, DriveMode, EngineSettings, PresetSettings, SitarMode } from './audioTypes';
 import { applySitarMode, makeDriveCurve, computeWaveform } from './audioDSP';
-import type { EngineSettingsV1 } from '../presets/presetSettings';
 type Take = {
   id: string;
   name: string;
@@ -737,6 +736,12 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
   // Delay bypass
   const [delayEnabled, setDelayEnabled] = useState(true);
+  // 🔁 Delay extras
+  const [delayHPHz, setDelayHPHz] = useState(120);     // corte graves
+  const [delayLPHz, setDelayLPHz] = useState(6000);   // corte agudos
+  const [delayModRate, setDelayModRate] = useState(0.35); // Hz
+  const [delayModDepthMs, setDelayModDepthMs] = useState(3); // ms
+
 
   // volumen master
   const [masterVolume, setMasterVolume] = useState(1.0);
@@ -766,180 +771,184 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
   // ✅ Helpers para presets (base / custom)
   const getCurrentSettings = useCallback((): PresetSettings => ({
-  ampGain,
-  ampTone,
-  ampMaster,
+    ampGain,
+    ampTone,
+    ampMaster,
 
-  bassAmount,
-  midAmount,
-  trebleAmount,
-  presenceAmount,
+    bassAmount,
+    midAmount,
+    trebleAmount,
+    presenceAmount,
 
-  driveAmount,
-  driveEnabled,
-  driveMode, // si existe en tu state
+    driveAmount,
+    driveEnabled,
+    driveMode, // si existe en tu state
 
-  delayEnabled,
-  delayTimeMs,
-  feedbackAmount,
-  mixAmount,
+    delayEnabled,
+    delayTimeMs,
+    feedbackAmount,
+    mixAmount,
 
-  reverbAmount,
+    reverbAmount,
 
-  sitarAmount,
-  sitarMode,
+    sitarAmount,
+    sitarMode,
 
-  compressorEnabled,
-  compressorThreshold,
-  compressorRatio,
-  compressorAttack,
-  compressorRelease,
-  compressorKnee,
-  compressorMakeup,
-  compressorMix,
+    compressorEnabled,
+    compressorThreshold,
+    compressorRatio,
+    compressorAttack,
+    compressorRelease,
+    compressorKnee,
+    compressorMakeup,
+    compressorMix,
 
-  phaserEnabled,
-  phaserRate,
-  phaserDepth,
-  phaserFeedback,
-  phaserMix,
-  phaserCenter,
+    phaserEnabled,
+    phaserRate,
+    phaserDepth,
+    phaserFeedback,
+    phaserMix,
+    phaserCenter,
 
-  flangerEnabled,
-  flangerRate,
-  flangerDepth,
-  flangerFeedback,
-  flangerMix,
+    flangerEnabled,
+    flangerRate,
+    flangerDepth,
+    flangerFeedback,
+    flangerMix,
 
-  octaveEnabled,
-  octaveTone,
-  octaveLevel,
-  octaveMix,
+    octaveEnabled,
+    octaveTone,
+    octaveLevel,
+    octaveMix,
 
-  valveEnabled,
-  valveDrive,
-  valveTone,
-  valveLevel,
-  valveMode,
+    valveEnabled,
+    valveDrive,
+    valveTone,
+    valveLevel,
+    valveMode,
 
-  ragaEnabled,
-  ragaResonance,
-  ragaDroneLevel,
-  ragaColor,
-}), [
-   compressorEnabled,
-  compressorThreshold,
-  compressorRatio,
-  compressorAttack,
-  compressorRelease,
-  compressorKnee,
-  compressorMakeup,
-  compressorMix,
-  ampGain,
-  ampTone,
-  ampMaster,
-  bassAmount,
-  midAmount,
-  trebleAmount,
-  presenceAmount,
-  driveAmount,
-  driveEnabled,
-  delayEnabled,
-  delayTimeMs,
-  feedbackAmount,
-  mixAmount,
-  reverbAmount,
-  sitarAmount,
-  sitarMode,
-  phaserEnabled,
-  phaserRate,
-  phaserDepth,
-  phaserFeedback,
-  phaserMix,
-  phaserCenter,
-  flangerEnabled,
-  flangerRate,
-  flangerDepth,
-  flangerFeedback,
-  flangerMix,
-  octaveEnabled,
-  octaveTone,
-  octaveLevel,
-  octaveMix,
-  valveEnabled,
-  valveDrive,
-  valveTone,
-  valveLevel,
-  valveMode,
-  ragaEnabled,
-  ragaResonance,
-  ragaDroneLevel,
-  ragaColor,
+    ragaEnabled,
+    ragaResonance,
+    ragaDroneLevel,
+    ragaColor,
+    delayHPHz: 0,
+    delayLPHz: 0,
+    delayModRate: 0,
+    delayModDepthMs: 0
+  }), [
+    compressorEnabled,
+    compressorThreshold,
+    compressorRatio,
+    compressorAttack,
+    compressorRelease,
+    compressorKnee,
+    compressorMakeup,
+    compressorMix,
+    ampGain,
+    ampTone,
+    ampMaster,
+    bassAmount,
+    midAmount,
+    trebleAmount,
+    presenceAmount,
+    driveAmount,
+    driveEnabled,
+    delayEnabled,
+    delayTimeMs,
+    feedbackAmount,
+    mixAmount,
+    reverbAmount,
+    sitarAmount,
+    sitarMode,
+    phaserEnabled,
+    phaserRate,
+    phaserDepth,
+    phaserFeedback,
+    phaserMix,
+    phaserCenter,
+    flangerEnabled,
+    flangerRate,
+    flangerDepth,
+    flangerFeedback,
+    flangerMix,
+    octaveEnabled,
+    octaveTone,
+    octaveLevel,
+    octaveMix,
+    valveEnabled,
+    valveDrive,
+    valveTone,
+    valveLevel,
+    valveMode,
+    ragaEnabled,
+    ragaResonance,
+    ragaDroneLevel,
+    ragaColor,
 
   ]);
 
   const applySettings = (s: PresetSettings) => {
-  setAmpGain(s.ampGain);
-  setAmpTone(s.ampTone);
-  setAmpMaster(s.ampMaster);
+    setAmpGain(s.ampGain);
+    setAmpTone(s.ampTone);
+    setAmpMaster(s.ampMaster);
 
-  setBassAmount(s.bassAmount);
-  setMidAmount(s.midAmount);
-  setTrebleAmount(s.trebleAmount);
-  setPresenceAmount(s.presenceAmount);
+    setBassAmount(s.bassAmount);
+    setMidAmount(s.midAmount);
+    setTrebleAmount(s.trebleAmount);
+    setPresenceAmount(s.presenceAmount);
 
-  setDriveAmount(s.driveAmount);
-  setDriveEnabled(s.driveEnabled);
-  setDriveMode(s.driveMode);
+    setDriveAmount(s.driveAmount);
+    setDriveEnabled(s.driveEnabled);
+    setDriveMode(s.driveMode);
 
-  setDelayEnabled(s.delayEnabled);
-  setDelayTimeMs(s.delayTimeMs);
-  setFeedbackAmount(s.feedbackAmount);
-  setMixAmount(s.mixAmount);
+    setDelayEnabled(s.delayEnabled);
+    setDelayTimeMs(s.delayTimeMs);
+    setFeedbackAmount(s.feedbackAmount);
+    setMixAmount(s.mixAmount);
 
-  setReverbAmount(s.reverbAmount);
+    setReverbAmount(s.reverbAmount);
 
-  setSitarAmount(s.sitarAmount);
-  setSitarMode(s.sitarMode);
+    setSitarAmount(s.sitarAmount);
+    setSitarMode(s.sitarMode);
 
-  setCompressorEnabled(s.compressorEnabled);
-  setCompressorThreshold(s.compressorThreshold);
-  setCompressorRatio(s.compressorRatio);
-  setCompressorAttack(s.compressorAttack);
-  setCompressorRelease(s.compressorRelease);
-  setCompressorKnee(s.compressorKnee);
-  setCompressorMakeup(s.compressorMakeup);
-  setCompressorMix(s.compressorMix);
+    setCompressorEnabled(s.compressorEnabled);
+    setCompressorThreshold(s.compressorThreshold);
+    setCompressorRatio(s.compressorRatio);
+    setCompressorAttack(s.compressorAttack);
+    setCompressorRelease(s.compressorRelease);
+    setCompressorKnee(s.compressorKnee);
+    setCompressorMakeup(s.compressorMakeup);
+    setCompressorMix(s.compressorMix);
 
-  setPhaserEnabled(s.phaserEnabled);
-  setPhaserRate(s.phaserRate);
-  setPhaserDepth(s.phaserDepth);
-  setPhaserFeedback(s.phaserFeedback);
-  setPhaserMix(s.phaserMix);
-  setPhaserCenter(s.phaserCenter);
+    setPhaserEnabled(s.phaserEnabled);
+    setPhaserRate(s.phaserRate);
+    setPhaserDepth(s.phaserDepth);
+    setPhaserFeedback(s.phaserFeedback);
+    setPhaserMix(s.phaserMix);
+    setPhaserCenter(s.phaserCenter);
 
-  setFlangerEnabled(s.flangerEnabled);
-  setFlangerRate(s.flangerRate);
-  setFlangerDepth(s.flangerDepth);
-  setFlangerFeedback(s.flangerFeedback);
-  setFlangerMix(s.flangerMix);
+    setFlangerEnabled(s.flangerEnabled);
+    setFlangerRate(s.flangerRate);
+    setFlangerDepth(s.flangerDepth);
+    setFlangerFeedback(s.flangerFeedback);
+    setFlangerMix(s.flangerMix);
 
-  setOctaveEnabled(s.octaveEnabled);
-  setOctaveTone(s.octaveTone);
-  setOctaveLevel(s.octaveLevel);
-  setOctaveMix(s.octaveMix);
+    setOctaveEnabled(s.octaveEnabled);
+    setOctaveTone(s.octaveTone);
+    setOctaveLevel(s.octaveLevel);
+    setOctaveMix(s.octaveMix);
 
-  setValveEnabled(s.valveEnabled);
-  setValveDrive(s.valveDrive);
-  setValveTone(s.valveTone);
-  setValveLevel(s.valveLevel);
-  setValveMode(s.valveMode);
+    setValveEnabled(s.valveEnabled);
+    setValveDrive(s.valveDrive);
+    setValveTone(s.valveTone);
+    setValveLevel(s.valveLevel);
+    setValveMode(s.valveMode);
 
-  setRagaEnabled(s.ragaEnabled);
-  setRagaResonance(s.ragaResonance);
-  setRagaDroneLevel(s.ragaDroneLevel);
-  setRagaColor(s.ragaColor);
-};
+    setRagaEnabled(s.ragaEnabled);
+    setRagaResonance(s.ragaResonance);
+    setRagaDroneLevel(s.ragaDroneLevel);
+    setRagaColor(s.ragaColor);
+  };
 
 
   // Refs para la animación del cursor en el preview offline
@@ -956,7 +965,8 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
   const antiRfPreDriveRef = useRef<BiquadFilterNode | null>(null);
 
-
+// --- PUNCH (no destructivo) ---
+const punchRef = useRef<{ armed: boolean; sec: number }>({ armed: false, sec: 0 });
 
 
 
@@ -1010,6 +1020,8 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
   // Tiempo de grabación
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+
+
   const recordingStartTimeRef = useRef<number | null>(null);
   const recordingTimerIdRef = useRef<number | null>(null);
 
@@ -1517,6 +1529,17 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     wetGainRef.current = wetGain;
 
     const delayNode = ctx.createDelay(2.0);
+    // 🔽 Delay tone shaping (muy importante)
+    const delayHP = ctx.createBiquadFilter();
+    delayHP.type = 'highpass';
+    delayHP.frequency.value = 120; // 80–200 típico
+    delayHP.Q.value = 0.707;
+
+    const delayLP = ctx.createBiquadFilter();
+    delayLP.type = 'lowpass';
+    delayLP.frequency.value = 6000; // 3k–6k clave
+    delayLP.Q.value = 0.707;
+
     delayNode.delayTime.value = delayTimeMs / 1000;
     delayNodeRef.current = delayNode;
 
@@ -1983,9 +2006,31 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
     preDelayGain.connect(dryGain);
     preDelayGain.connect(delayNode);
 
-    delayNode.connect(wetGain);
-    delayNode.connect(feedbackGain);
+    // delay → filtros → wet
+    delayNode.connect(delayHP);
+    delayHP.connect(delayLP);
+    delayLP.connect(wetGain);
+
+    // feedback desde señal ya filtrada (oscurece cada repeat)
+    delayLP.connect(feedbackGain);
     feedbackGain.connect(delayNode);
+
+    feedbackGain.connect(delayNode);
+
+    // 🎛️ Delay modulation (tape / analog vibe)
+    const delayLFO = ctx.createOscillator();
+    delayLFO.type = 'sine';
+    delayLFO.frequency.value = 0.35; // 0.2–0.6 Hz
+
+    const delayLFODepth = ctx.createGain();
+    delayLFODepth.gain.value = 0.003; // ≈ 3ms (MUY IMPORTANTE no pasarse)
+
+    // LFO → depth → delayTime
+    delayLFO.connect(delayLFODepth);
+    delayLFODepth.connect(delayNode.delayTime);
+
+    delayLFO.start();
+
 
     // To master
     dryGain.connect(masterGain);
@@ -2104,48 +2149,48 @@ export const AudioEngineProvider: React.FC<Props> = ({ children }) => {
 
   // Procesar un archivo a través del Sitar Amp usando OfflineAudioContext
   const processFileThroughSitar = useCallback(async (file: File) => {
-  console.log('[offline] processing:', file.name);
+    console.log('[offline] processing:', file.name);
 
-  const arr = await file.arrayBuffer();
+    const arr = await file.arrayBuffer();
 
-  // decode con un AudioContext temporal
-  const temp = new AudioContext();
-  const decoded = await temp.decodeAudioData(arr.slice(0));
-  await temp.close();
+    // decode con un AudioContext temporal
+    const temp = new AudioContext();
+    const decoded = await temp.decodeAudioData(arr.slice(0));
+    await temp.close();
 
-  // Offline con el sampleRate del archivo
-  const offline = new OfflineAudioContext(
-    decoded.numberOfChannels,
-    decoded.length,
-    decoded.sampleRate
-  );
+    // Offline con el sampleRate del archivo
+    const offline = new OfflineAudioContext(
+      decoded.numberOfChannels,
+      decoded.length,
+      decoded.sampleRate
+    );
 
-  const src = new AudioBufferSourceNode(offline, { buffer: decoded });
+    const src = new AudioBufferSourceNode(offline, { buffer: decoded });
 
-  // settings actuales (usá TU fuente real)
-  const settings = getCurrentSettings(); // vos lo tenés en tu archivo (se ve en tu screenshot)
+    // settings actuales (usá TU fuente real)
+    const settings = getCurrentSettings(); // vos lo tenés en tu archivo (se ve en tu screenshot)
 
-const graph = buildOfflineFullGraph(offline, settings);
-
-
-
-  src.connect(graph.input);
-  graph.output.connect(offline.destination);
-
-  src.start(0);
-
-  const rendered = await offline.startRendering();
-
-  console.log('[offline] rendered RMS:', rms(rendered));
-
-  setProcessedBuffer(rendered);
-  console.log('[offline] rendered duration:', rendered.duration);
-console.log('[offline] rendered max:', Math.max(...rendered.getChannelData(0).slice(0, 50000).map(Math.abs)));
+    const graph = buildOfflineFullGraph(offline, settings);
 
 
-  const wf = computeWaveform(rendered);
-  setProcessedWaveform(wf);
-}, [getCurrentSettings]);
+
+    src.connect(graph.input);
+    graph.output.connect(offline.destination);
+
+    src.start(0);
+
+    const rendered = await offline.startRendering();
+
+    console.log('[offline] rendered RMS:', rms(rendered));
+
+    setProcessedBuffer(rendered);
+    console.log('[offline] rendered duration:', rendered.duration);
+    console.log('[offline] rendered max:', Math.max(...rendered.getChannelData(0).slice(0, 50000).map(Math.abs)));
+
+
+    const wf = computeWaveform(rendered);
+    setProcessedWaveform(wf);
+  }, [getCurrentSettings]);
 
 
   const setupRecordingGraph = useCallback(() => {
@@ -3128,6 +3173,17 @@ console.log('[offline] rendered max:', Math.max(...rendered.getChannelData(0).sl
     setFeedbackAmount,
     mixAmount,
     setMixAmount,
+
+    // Delay extras (agregá esto)
+    delayHPHz,
+    setDelayHPHz,
+    delayLPHz,
+    setDelayLPHz,
+    delayModRate,
+    setDelayModRate,
+    delayModDepthMs,
+    setDelayModDepthMs,
+
 
     isPunchArmed,
     armPunchIn,
